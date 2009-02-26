@@ -36,7 +36,6 @@ import java.io.InputStream;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
-import org.jruby.RubyFile;
 import org.jruby.RubyHash;
 import org.jruby.RubyString;
 import org.jruby.ast.Node;
@@ -125,7 +124,6 @@ public class Parser {
             if (result.getEndOffset() >= 0) {
                 IRubyObject verbose = runtime.getVerbose();
                 runtime.setVerbose(runtime.getNil());
-            	runtime.defineGlobalConstant("DATA", new RubyFile(runtime, file, content));
                 runtime.setVerbose(verbose);
             	result.setEndOffset(-1);
             }

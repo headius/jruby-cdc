@@ -36,7 +36,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import org.jruby.util.io.STDIO;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -170,7 +169,6 @@ public class RubyGlobal {
         runtime.defineVariable(new StringGlobalVariable(runtime, "$\\", runtime.getNil()));
         runtime.defineVariable(new StringGlobalVariable(runtime, "$,", runtime.getNil()));
 
-        runtime.defineVariable(new LineNumberGlobalVariable(runtime, "$.", RubyFixnum.one(runtime)));
         runtime.defineVariable(new LastlineGlobalVariable(runtime, "$_"));
         runtime.defineVariable(new LastExitStatusVariable(runtime, "$?"));
 
@@ -202,23 +200,6 @@ public class RubyGlobal {
 
         runtime.defineVariable(new BacktraceGlobalVariable(runtime, "$@"));
 
-        IRubyObject stdin = new RubyIO(runtime, STDIO.IN);
-        IRubyObject stdout = new RubyIO(runtime, STDIO.OUT);
-        IRubyObject stderr = new RubyIO(runtime, STDIO.ERR);
-
-        runtime.defineVariable(new InputGlobalVariable(runtime, "$stdin", stdin));
-
-        runtime.defineVariable(new OutputGlobalVariable(runtime, "$stdout", stdout));
-        runtime.getGlobalVariables().alias("$>", "$stdout");
-        runtime.getGlobalVariables().alias("$defout", "$stdout");
-
-        runtime.defineVariable(new OutputGlobalVariable(runtime, "$stderr", stderr));
-        runtime.getGlobalVariables().alias("$deferr", "$stderr");
-
-        runtime.defineGlobalConstant("STDIN", stdin);
-        runtime.defineGlobalConstant("STDOUT", stdout);
-        runtime.defineGlobalConstant("STDERR", stderr);
-
         runtime.defineVariable(new LoadedFeatures(runtime, "$\""));
         runtime.defineVariable(new LoadedFeatures(runtime, "$LOADED_FEATURES"));
 
@@ -231,11 +212,6 @@ public class RubyGlobal {
         runtime.defineVariable(new PostMatchGlobalVariable(runtime, "$'"));
         runtime.defineVariable(new LastMatchGlobalVariable(runtime, "$+"));
         runtime.defineVariable(new BackRefGlobalVariable(runtime, "$~"));
-
-        // On platforms without a c-library accessable through JNA, getpid will return hashCode 
-        // as $$ used to. Using $$ to kill processes could take down many runtimes, but by basing
-        // $$ on getpid() where available, we have the same semantics as MRI.
-        runtime.getGlobalVariables().defineReadonly("$$", new ValueAccessor(runtime.newFixnum(runtime.getPosix().getpid())));
 
         // after defn of $stderr as the call may produce warnings
         defineGlobalEnvConstants(runtime);
@@ -253,9 +229,6 @@ public class RubyGlobal {
                 new ValueAccessor(runtime.getInstanceConfig().isSplit() ? runtime.getTrue() : runtime.getNil()));
         runtime.getGlobalVariables().defineReadonly("$-l", 
                 new ValueAccessor(runtime.getInstanceConfig().isProcessLineEnds() ? runtime.getTrue() : runtime.getNil()));
-
-        // ARGF, $< object
-        RubyArgsFile.initArgsFile(runtime);
     }
 
     private static void defineGlobalEnvConstants(Ruby runtime) {
@@ -374,20 +347,6 @@ public class RubyGlobal {
         public IRubyObject set(IRubyObject value) {
             RuntimeHelpers.setBackref(runtime, runtime.getCurrentContext(), value);
             return value;
-        }
-    }
-
-    // Accessor methods.
-
-    private static class LineNumberGlobalVariable extends GlobalVariable {
-        public LineNumberGlobalVariable(Ruby runtime, String name, RubyFixnum value) {
-            super(runtime, name, value);
-        }
-
-        @Override
-        public IRubyObject set(IRubyObject value) {
-            RubyArgsFile.setCurrentLineNumber(runtime.getGlobalVariables().get("$<"), value);
-            return super.set(value);
         }
     }
 
@@ -570,33 +529,6 @@ public class RubyGlobal {
                 return value;
             }
             
-            return super.set(value);
-        }
-    }
-
-    private static class OutputGlobalVariable extends GlobalVariable {
-        public OutputGlobalVariable(Ruby runtime, String name, IRubyObject value) {
-            super(runtime, name, value);
-        }
-
-        @Override
-        public IRubyObject set(IRubyObject value) {
-            if (value == get()) {
-                return value;
-            }
-            if (value instanceof RubyIO) {
-                RubyIO io = (RubyIO)value;
-                
-                // HACK: in order to have stdout/err act like ttys and flush always,
-                // we set anything assigned to stdout/stderr to sync
-                io.getHandler().setSync(true);
-            }
-
-            if (!value.respondsTo("write")) {
-                throw runtime.newTypeError(name() + " must have write method, " +
-                                    value.getType().getName() + " given");
-            }
-
             return super.set(value);
         }
     }

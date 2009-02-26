@@ -31,7 +31,6 @@ import java.io.InputStream;
 import java.io.IOException;
 
 import org.jruby.RubyFixnum;
-import org.jruby.RubyIO;
 import org.jruby.RubyString;
 import org.jruby.runtime.CallSite;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -48,7 +47,6 @@ import org.jruby.runtime.MethodIndex;
  */
 public class IOInputStream extends InputStream {
     private final IRubyObject io;
-    private final InputStream in;
     private final IRubyObject numOne;
     private final CallSite readAdapter = MethodIndex.getFunctionalCallSite("read");
 
@@ -62,26 +60,18 @@ public class IOInputStream extends InputStream {
             throw new IllegalArgumentException("Object: " + io + " is not a legal argument to this wrapper, cause it doesn't respond to \"read\".");
         }
         this.io = io;
-        this.in = io instanceof RubyIO ? ((RubyIO)io).getInStream() : null;
         this.numOne = RubyFixnum.one(this.io.getRuntime());
     }
 
     @Override
     public void close() throws IOException {
-        if (in != null) {
-            in.close();
-        }
     }
 
     // Note: this method produces meaningful results
     // only for RubyIO objects. For everything else returns 0.
     @Override
     public int available() throws IOException {
-        if (in != null) {
-            return in.available();
-        } else {
-            return 0;
-        }
+        return 0;
     }
     
     public int read() throws IOException {

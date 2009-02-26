@@ -40,12 +40,10 @@
 package org.jruby;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -60,20 +58,11 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.WeakHashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jcodings.Encoding;
 import org.joda.time.DateTimeZone;
 import org.jruby.ast.Node;
-import org.jruby.ast.executable.RubiniusRunner;
 import org.jruby.ast.executable.Script;
-import org.jruby.ast.executable.YARVCompiledRunner;
 import org.jruby.common.RubyWarnings;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.compiler.ASTCompiler;
@@ -81,20 +70,14 @@ import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.JITCompiler;
 import org.jruby.compiler.NotCompilableException;
 import org.jruby.compiler.impl.StandardASMCompiler;
-import org.jruby.compiler.yarv.StandardYARVCompiler;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.MainExitException;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.ext.JRubyPOSIXHandler;
 import org.jruby.ext.LateLoadingLibrary;
-import org.jruby.ext.posix.POSIX;
-import org.jruby.ext.posix.POSIXFactory;
 import org.jruby.internal.runtime.GlobalVariables;
 import org.jruby.internal.runtime.ThreadService;
 import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.javasupport.JavaSupport;
-import org.jruby.management.ClassCache;
-import org.jruby.management.Config;
 import org.jruby.management.ParserStats;
 import org.jruby.parser.EvalStaticScope;
 import org.jruby.parser.Parser;
@@ -126,15 +109,7 @@ import org.jruby.util.JavaNameMangler;
 import org.jruby.util.KCode;
 import org.jruby.util.SafePropertyAccessor;
 import org.jruby.util.collections.WeakHashSet;
-import org.jruby.util.io.ChannelDescriptor;
 
-import com.kenai.constantine.Constant;
-import com.kenai.constantine.ConstantSet;
-import com.kenai.constantine.platform.Errno;
-import java.util.EnumSet;
-import org.jruby.management.BeanManager;
-import org.jruby.management.BeanManagerFactory;
-import org.jruby.threading.DaemonThreadFactory;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -215,13 +190,8 @@ public final class Ruby {
         this.profile            = config.getProfile();
         this.currentDirectory   = config.getCurrentDirectory();
         this.kcode              = config.getKCode();
-        this.beanManager        = BeanManagerFactory.create(this, config.isManagementEnabled());
         this.jitCompiler        = new JITCompiler(this);
         this.parserStats        = new ParserStats(this);
-        
-        this.beanManager.register(new Config(this));
-        this.beanManager.register(parserStats);
-        this.beanManager.register(new ClassCache(this));
     }
     
     /**
@@ -331,31 +301,18 @@ public final class Ruby {
             runScript(script);
             return;
         }
-        
-        if(config.isYARVEnabled()) {
-            if (config.isShowBytecode()) System.err.print("error: bytecode printing only works with JVM bytecode");
-            new YARVCompiledRunner(this, inputStream, filename).run();
-        } else if(config.isRubiniusEnabled()) {
-            if (config.isShowBytecode()) System.err.print("error: bytecode printing only works with JVM bytecode");
-            new RubiniusRunner(this, inputStream, filename).run();
-        } else {
-            Node scriptNode = parseFromMain(inputStream, filename);
-            ThreadContext context = getCurrentContext();
 
-            String oldFile = context.getFile();
-            int oldLine = context.getLine();
-            try {
-                context.setFileAndLine(scriptNode.getPosition());
+        Node scriptNode = parseFromMain(inputStream, filename);
+        ThreadContext context = getCurrentContext();
 
-                if (config.isAssumePrinting() || config.isAssumeLoop()) {
-                    runWithGetsLoop(scriptNode, config.isAssumePrinting(), config.isProcessLineEnds(),
-                            config.isSplit(), config.isYARVCompileEnabled());
-                } else {
-                    runNormally(scriptNode, config.isYARVCompileEnabled());
-                }
-            } finally {
-                context.setFileAndLine(oldFile, oldLine);
-            }
+        String oldFile = context.getFile();
+        int oldLine = context.getLine();
+        try {
+            context.setFileAndLine(scriptNode.getPosition());
+
+            runNormally(scriptNode, config.isYARVCompileEnabled());
+        } finally {
+            context.setFileAndLine(oldFile, oldLine);
         }
     }
 
@@ -379,77 +336,6 @@ public final class Ruby {
     }
     
     /**
-     * Run the given script with a "while gets; end" loop wrapped around it.
-     * This is primarily used for the -n command-line flag, to allow writing
-     * a short script that processes input lines using the specified code.
-     * 
-     * @param scriptNode The root node of the script to execute
-     * @param printing Whether $_ should be printed after each loop (as in the
-     * -p command-line flag)
-     * @param processLineEnds Whether line endings should be processed by
-     * setting $\ to $/ and <code>chop!</code>ing every line read
-     * @param split Whether to split each line read using <code>String#split</code>
-     * @param yarvCompile Whether to compile the target script to YARV (Ruby 1.9)
-     * bytecode before executing.
-     * @return The result of executing the specified script
-     */
-    public IRubyObject runWithGetsLoop(Node scriptNode, boolean printing, boolean processLineEnds, boolean split, boolean yarvCompile) {
-        ThreadContext context = getCurrentContext();
-        
-        Script script = null;
-        YARVCompiledRunner runner = null;
-        boolean compile = getInstanceConfig().getCompileMode().shouldPrecompileCLI();
-        if (compile || !yarvCompile) {
-            script = tryCompile(scriptNode);
-            if (compile && script == null) {
-                // terminate; tryCompile will have printed out an error and we're done
-                return getNil();
-            }
-        } else if (yarvCompile) {
-            runner = tryCompileYarv(scriptNode);
-        }
-        
-        if (processLineEnds) {
-            getGlobalVariables().set("$\\", getGlobalVariables().get("$/"));
-        }
-        
-        while (RubyKernel.gets(context, getTopSelf(), IRubyObject.NULL_ARRAY).isTrue()) {
-            loop: while (true) { // Used for the 'redo' command
-                try {
-                    if (processLineEnds) {
-                        getGlobalVariables().get("$_").callMethod(context, "chop!");
-                    }
-                    
-                    if (split) {
-                        getGlobalVariables().set("$F", getGlobalVariables().get("$_").callMethod(context, "split"));
-                    }
-                    
-                    if (script != null) {
-                        runScript(script);
-                    } else if (runner != null) {
-                        runYarv(runner);
-                    } else {
-                        runInterpreter(scriptNode);
-                    }
-                    
-                    if (printing) RubyKernel.print(context, getKernel(), new IRubyObject[] {getGlobalVariables().get("$_")});
-                    break loop;
-                } catch (JumpException.RedoJump rj) {
-                    // do nothing, this iteration restarts
-                } catch (JumpException.NextJump nj) {
-                    // recheck condition
-                    break loop;
-                } catch (JumpException.BreakJump bj) {
-                    // end loop
-                    return (IRubyObject) bj.getValue();
-                }
-            }
-        }
-        
-        return getNil();
-    }
-    
-    /**
      * Run the specified script without any of the loop-processing wrapper
      * code.
      * 
@@ -460,13 +346,9 @@ public final class Ruby {
      */
     public IRubyObject runNormally(Node scriptNode, boolean yarvCompile) {
         Script script = null;
-        YARVCompiledRunner runner = null;
         boolean compile = getInstanceConfig().getCompileMode().shouldPrecompileCLI();
         boolean forceCompile = getInstanceConfig().getCompileMode().shouldPrecompileAll();
-        if (yarvCompile) {
-            runner = tryCompileYarv(scriptNode);
-        // FIXME: Once 1.9 compilation is supported this should be removed
-        } else if (compile) {
+        if (compile) {
             script = tryCompile(scriptNode);
             if (forceCompile && script == null) {
                 return getNil();
@@ -479,8 +361,6 @@ public final class Ruby {
             } else {
                 return runScript(script);
             }
-        } else if (runner != null) {
-            return runYarv(runner);
         } else {
             if (config.isShowBytecode()) System.err.print("error: bytecode printing only works with JVM bytecode");
             return runInterpreter(scriptNode);
@@ -553,36 +433,11 @@ public final class Ruby {
         return script;
     }
     
-    private YARVCompiledRunner tryCompileYarv(Node node) {
-        try {
-            StandardYARVCompiler compiler = new StandardYARVCompiler(this);
-            ASTCompiler.getYARVCompiler().compile(node, compiler);
-            org.jruby.lexer.yacc.ISourcePosition p = node.getPosition();
-            if(p == null && node instanceof org.jruby.ast.RootNode) {
-                p = ((org.jruby.ast.RootNode)node).getBodyNode().getPosition();
-            }
-            return new YARVCompiledRunner(this,compiler.getInstructionSequence("<main>",p.getFile(),"toplevel"));
-        } catch (NotCompilableException nce) {
-            System.err.println("Error -- Not compileable: " + nce.getMessage());
-            return null;
-        } catch (JumpException.ReturnJump rj) {
-            return null;
-        }
-    }
-    
     private IRubyObject runScript(Script script) {
         ThreadContext context = getCurrentContext();
         
         try {
             return script.load(context, context.getFrameSelf(), IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return (IRubyObject) rj.getValue();
-        }
-    }
-    
-    private IRubyObject runYarv(YARVCompiledRunner runner) {
-        try {
-            return runner.run();
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
@@ -602,10 +457,6 @@ public final class Ruby {
 
     public Parser getParser() {
         return parser;
-    }
-    
-    public BeanManager getBeanManager() {
-        return beanManager;
     }
     
     public JITCompiler getJITCompiler() {
@@ -629,10 +480,10 @@ public final class Ruby {
     }
     
     public int allocSymbolId() {
-        return symbolLastId.incrementAndGet();
+        return ++symbolLastId;
     }
     public int allocModuleId() {
-        return moduleLastId.incrementAndGet();
+        return ++moduleLastId;
     }
 
     /**
@@ -908,19 +759,7 @@ public final class Ruby {
         
         // Construct key services
         loadService = config.createLoadService(this);
-        posix = POSIXFactory.getPOSIX(new JRubyPOSIXHandler(this), RubyInstanceConfig.nativeEnabled);
         javaSupport = new JavaSupport(this);
-        
-        if (RubyInstanceConfig.POOLING_ENABLED) {
-            Executors.newCachedThreadPool();
-            executor = new ThreadPoolExecutor(
-                    RubyInstanceConfig.POOL_MIN,
-                    RubyInstanceConfig.POOL_MAX,
-                    RubyInstanceConfig.POOL_TTL,
-                    TimeUnit.SECONDS,
-                    new SynchronousQueue<Runnable>(),
-                    new DaemonThreadFactory());
-        }
         
         // initialize the root of the class hierarchy completely
         initRoot();
@@ -1073,7 +912,6 @@ public final class Ruby {
         if (profile.allowClass("Bignum")) {
             RubyBignum.createBignumClass(this);
         }
-        ioClass = RubyIO.createIOClass(this);
 
         if (profile.allowClass("Struct")) {
             RubyStruct.createStructClass(this);
@@ -1112,22 +950,6 @@ public final class Ruby {
         }
         if (profile.allowModule("Marshal")) {
             RubyMarshal.createMarshalModule(this);
-        }
-        if (profile.allowClass("Dir")) {
-            RubyDir.createDirClass(this);
-        }
-        if (profile.allowModule("FileTest")) {
-            RubyFileTest.createFileTestModule(this);
-        }
-        // depends on IO, FileTest
-        if (profile.allowClass("File")) {
-            RubyFile.createFileClass(this);
-        }
-        if (profile.allowClass("File::Stat")) {
-            RubyFileStat.createFileStatClass(this);
-        }
-        if (profile.allowModule("Process")) {
-            RubyProcess.createProcessModule(this);
         }
         if (profile.allowClass("Time")) {
             RubyTime.createTimeClass(this);
@@ -1206,8 +1028,6 @@ public final class Ruby {
                 encodingCompatibilityError = defineClassUnder("CompatibilityError", encodingError, encodingError.getAllocator(), encodingClass);
             }
         }
-
-        initErrno();
     }
     
     private RubyClass defineClassIfAllowed(String name, RubyClass superClass) {
@@ -1220,39 +1040,6 @@ public final class Ruby {
     }
 
     private Map<Integer, RubyClass> errnos = new HashMap<Integer, RubyClass>();
-
-    public RubyClass getErrno(int n) {
-        return errnos.get(n);
-    }
-
-    /**
-     * Create module Errno's Variables.  We have this method since Errno does not have it's
-     * own java class.
-     */
-    private void initErrno() {
-        if (profile.allowModule("Errno")) {
-            errnoModule = defineModule("Errno");
-            for (Errno e : Errno.values()) {
-                Constant c = (Constant) e;
-                if (Character.isUpperCase(c.name().charAt(0))) {
-                    createSysErr(c.value(), c.name());
-                }
-            }
-        }
-    }
-
-    /**
-     * Creates a system error.
-     * @param i the error code (will probably use a java exception instead)
-     * @param name of the error to define.
-     **/
-    private void createSysErr(int i, String name) {
-        if(profile.allowClass(name)) {
-            RubyClass errno = getErrno().defineClassUnder(name, systemCallError, systemCallError.getAllocator());
-            errnos.put(i, errno);
-            errno.defineConstant("Errno", newFixnum(i));
-        }
-    }
 
     private void initBuiltins() {
         addLazyBuiltin("java.rb", "java", "org.jruby.javasupport.Java");
@@ -2484,12 +2271,6 @@ public final class Ruby {
 
         getThreadService().disposeCurrentThread();
 
-        getBeanManager().unregisterCompiler();
-        getBeanManager().unregisterConfig();
-        getBeanManager().unregisterParserStats();
-        getBeanManager().unregisterClassCache();
-        getBeanManager().unregisterMethodCache();
-
         if (status != 0) {
             throw newSystemExit(status);
         }
@@ -2541,24 +2322,12 @@ public final class Ruby {
         return value ? trueObject : falseObject;
     }
 
-    public RubyFileStat newFileStat(String filename, boolean lstat) {
-        return RubyFileStat.newFileStat(this, filename, lstat);
-    }
-    
-    public RubyFileStat newFileStat(FileDescriptor descriptor) {
-        return RubyFileStat.newFileStat(this, descriptor);
-    }
-
     public RubyFixnum newFixnum(long value) {
         return RubyFixnum.newFixnum(this, value);
     }
 
     public RubyFixnum newFixnum(int value) {
         return RubyFixnum.newFixnum(this, value);
-    }
-
-    public RubyFixnum newFixnum(Constant value) {
-        return RubyFixnum.newFixnum(this, value.value());
     }
 
     public RubyFloat newFloat(double value) {
@@ -2927,64 +2696,6 @@ public final class Ruby {
         return objectSpace;
     }
 
-    private class WeakDescriptorReference extends WeakReference {
-        private int fileno;
-
-        public WeakDescriptorReference(ChannelDescriptor descriptor, ReferenceQueue queue) {
-            super(descriptor, queue);
-            this.fileno = descriptor.getFileno();
-        }
-
-        public int getFileno() {
-            return fileno;
-        }
-    }
-
-    public Map<Integer, WeakDescriptorReference> getDescriptors() {
-        return descriptors;
-    }
-
-    private void cleanDescriptors() {
-        Reference reference;
-        while ((reference = descriptorQueue.poll()) != null) {
-            int fileno = ((WeakDescriptorReference)reference).getFileno();
-            descriptors.remove(fileno);
-        }
-    }
-
-    public void registerDescriptor(ChannelDescriptor descriptor, boolean isRetained) {
-        cleanDescriptors();
-        
-        int fileno = descriptor.getFileno();
-        Integer filenoKey = new Integer(fileno);
-        descriptors.put(filenoKey, new WeakDescriptorReference(descriptor, descriptorQueue));
-        if (isRetained) {
-            retainedDescriptors.put(filenoKey, descriptor);
-        }
-    }
-
-    public void registerDescriptor(ChannelDescriptor descriptor) {
-        registerDescriptor(descriptor,false); // default: don't retain
-    }
-
-    public void unregisterDescriptor(int aFileno) {
-        cleanDescriptors();
-        
-        Integer aFilenoKey = new Integer(aFileno);
-        descriptors.remove(aFilenoKey);
-        retainedDescriptors.remove(aFilenoKey);
-    }
-
-    public ChannelDescriptor getDescriptorByFileno(int aFileno) {
-        cleanDescriptors();
-        
-        Reference reference = descriptors.get(new Integer(aFileno));
-        if (reference == null) {
-            return null;
-        }
-        return (ChannelDescriptor)reference.get();
-    }
-
     public long incrementRandomSeedSequence() {
         return randomSeedSequence++;
     }
@@ -3090,10 +2801,6 @@ public final class Ruby {
         securityRestricted = restricted;
     }
     
-    public POSIX getPosix() {
-        return posix;
-    }
-    
     public void setRecordSeparatorVar(GlobalVariable recordSeparatorVar) {
         this.recordSeparatorVar = recordSeparatorVar;
     }
@@ -3104,10 +2811,6 @@ public final class Ruby {
     
     public Set<Script> getJittedMethods() {
         return jittedMethods;
-    }
-    
-    public ExecutorService getExecutor() {
-        return executor;
     }
 
     public Map<String, DateTimeZone> getTimezoneCache() {
@@ -3122,36 +2825,14 @@ public final class Ruby {
         constantGeneration++;
     }
 
-    public <E extends Enum<E>> void loadConstantSet(RubyModule module, Class<E> enumClass) {
-        for (E e : EnumSet.allOf(enumClass)) {
-            Constant c = (Constant) e;
-            if (Character.isUpperCase(c.name().charAt(0))) {
-                module.fastSetConstant(c.name(), newFixnum(c.value()));
-            }
-        }
-    }
-    public void loadConstantSet(RubyModule module, String constantSetName) {
-        for (Constant c : ConstantSet.getConstantSet(constantSetName)) {
-            if (Character.isUpperCase(c.name().charAt(0))) {
-                module.fastSetConstant(c.name(), newFixnum(c.value()));
-            }
-        }
-    }
-
     private volatile int constantGeneration = 1;
     private final ThreadService threadService;
-    
-    private POSIX posix;
 
     private int stackTraces = 0;
 
     private ObjectSpace objectSpace = new ObjectSpace();
 
     private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable(this);
-    private Map<Integer, WeakDescriptorReference> descriptors = new ConcurrentHashMap<Integer, WeakDescriptorReference>();
-    private ReferenceQueue<ChannelDescriptor> descriptorQueue = new ReferenceQueue<ChannelDescriptor>();
-    // ChannelDescriptors opened by sysopen are cached to avoid collection
-    private Map<Integer, ChannelDescriptor> retainedDescriptors = new ConcurrentHashMap<Integer, ChannelDescriptor>();
 
     private long randomSeed = 0;
     private long randomSeedSequence = 0;
@@ -3236,9 +2917,6 @@ public final class Ruby {
     // Java support
     private JavaSupport javaSupport;
     private JRubyClassLoader jrubyClassLoader;
-    
-    // Management/monitoring
-    private BeanManager beanManager;
 
     // Parser stats
     private ParserStats parserStats;
@@ -3285,8 +2963,8 @@ public final class Ruby {
     private KCode kcode = KCode.NONE;
 
     // Atomic integers for symbol and method IDs
-    private AtomicInteger symbolLastId = new AtomicInteger(128);
-    private AtomicInteger moduleLastId = new AtomicInteger(0);
+    private volatile int symbolLastId = 128;
+    private volatile int moduleLastId = 0;
 
     private Object respondToMethod;
     private Object objectToYamlMethod;
@@ -3309,7 +2987,4 @@ public final class Ruby {
 
     // mutex that controls modifications of internal finalizers
     private final Object internalFinalizersMutex = new Object();
-    
-    // A thread pool to use for executing this runtime's Ruby threads
-    private ExecutorService executor;
 }

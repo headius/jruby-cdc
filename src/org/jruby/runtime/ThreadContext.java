@@ -51,7 +51,6 @@ import org.jruby.exceptions.JumpException.ReturnJump;
 import org.jruby.internal.runtime.JumpTarget;
 import org.jruby.internal.runtime.methods.DefaultMethod;
 import org.jruby.lexer.yacc.ISourcePosition;
-import org.jruby.libraries.FiberLibrary.Fiber;
 import org.jruby.parser.BlockStaticScope;
 import org.jruby.parser.LocalStaticScope;
 import org.jruby.parser.StaticScope;
@@ -79,7 +78,6 @@ public final class ThreadContext {
     private boolean isWithinDefined;
     
     private RubyThread thread;
-    private Fiber fiber;
     
     //private UnsynchronizedStack parentStack;
     private RubyModule[] parentStack = new RubyModule[INITIAL_SIZE];
@@ -255,25 +253,6 @@ public final class ThreadContext {
     public void setThread(RubyThread thread) {
         this.thread = thread;
     }
-    
-    public Fiber getFiber() {
-        return fiber;
-    }
-    
-    public void setFiber(Fiber fiber) {
-        this.fiber = fiber;
-    }
-    
-//    public IRubyObject getLastline() {
-//        IRubyObject value = getCurrentScope().getLastLine();
-//        
-//        // DynamicScope does not preinitialize these values since they are virtually never used.
-//        return value == null ? runtime.getNil() : value;
-//    }
-//    
-//    public void setLastline(IRubyObject value) {
-//        getCurrentScope().setLastLine(value);
-//    }
     
     //////////////////// CATCH MANAGEMENT ////////////////////////
     private void expandCatchIfNecessary() {

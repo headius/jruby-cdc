@@ -216,39 +216,25 @@ public class Main {
         } else {
             long now = -1;
 
+            if (config.isBenchmarking()) {
+                now = System.currentTimeMillis();
+            }
+
+            if (config.isSamplingEnabled()) {
+                SimpleSampler.startSampleThread();
+            }
+
             try {
+                runtime.runFromMain(in, filename);
+            } finally {
+                runtime.tearDown();
+
                 if (config.isBenchmarking()) {
-                    now = System.currentTimeMillis();
+                    config.getOutput().println("Runtime: " + (System.currentTimeMillis() - now) + " ms");
                 }
 
                 if (config.isSamplingEnabled()) {
-                    SimpleSampler.startSampleThread();
-                }
-
-                try {
-                    runtime.runFromMain(in, filename);
-                } finally {
-                    runtime.tearDown();
-
-                    if (config.isBenchmarking()) {
-                        config.getOutput().println("Runtime: " + (System.currentTimeMillis() - now) + " ms");
-                    }
-
-                    if (config.isSamplingEnabled()) {
-                        org.jruby.util.SimpleSampler.report();
-                    }
-                }
-            } catch (RaiseException rj) {
-                RubyException raisedException = rj.getException();
-                if (runtime.getSystemExit().isInstance(raisedException)) {
-                    IRubyObject status = raisedException.callMethod(runtime.getCurrentContext(), "status");
-
-                    if (status != null && !status.isNil()) {
-                        return RubyNumeric.fix2int(status);
-                    }
-                } else {
-                    runtime.printError(raisedException);
-                    return 1;
+                    org.jruby.util.SimpleSampler.report();
                 }
             }
         }

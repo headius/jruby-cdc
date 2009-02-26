@@ -1080,9 +1080,9 @@ public class RubyZlib {
         
         @JRubyMethod(name = "puts", rest = true)
         public IRubyObject puts(ThreadContext context, IRubyObject[] args) throws IOException {
-            RubyStringIO sio = (RubyStringIO)getRuntime().fastGetClass("StringIO").newInstance(context, new IRubyObject[0], Block.NULL_BLOCK);
-            sio.puts(context, args);
-            write(sio.string());
+//            RubyStringIO sio = (RubyStringIO)getRuntime().fastGetClass("StringIO").newInstance(context, new IRubyObject[0], Block.NULL_BLOCK);
+//            sio.puts(context, args);
+//            write(sio.string());
             
             return getRuntime().getNil();
         }

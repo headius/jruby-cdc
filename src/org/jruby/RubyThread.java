@@ -32,19 +32,12 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.io.IOException;
-import java.nio.channels.Channel;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.util.HashMap;
 import java.util.Map;
 
-import java.util.Set;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.exceptions.ThreadKill;
-import org.jruby.internal.runtime.FutureThread;
 import org.jruby.internal.runtime.NativeThread;
 import org.jruby.internal.runtime.RubyRunnable;
 import org.jruby.internal.runtime.ThreadLike;
@@ -60,7 +53,6 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyClass;
 import org.jruby.runtime.ObjectMarshal;
 import org.jruby.runtime.Visibility;
-import org.jruby.util.io.BlockingIO;
 
 /**
  * Implementation of Ruby's <code>Thread</code> class.  Each Ruby thread is
@@ -203,30 +195,17 @@ public class RubyThread extends RubyObject {
         if (!block.isGiven()) throw runtime.newThreadError("must be called with a block");
 
         RubyRunnable runnable = new RubyRunnable(this, args, block);
-        if (RubyInstanceConfig.POOLING_ENABLED) {
-            FutureThread futureThread = new FutureThread(this, runnable);
-            threadImpl = futureThread;
+        Thread thread = new Thread(runnable);
+        thread.setDaemon(true);
+        threadImpl = new NativeThread(this, thread);
 
-            // set to default thread group
-            runtime.getDefaultThreadGroup().addDirectly(this);
+        // set to default thread group
+        runtime.getDefaultThreadGroup().addDirectly(this);
 
-            threadImpl.start();
+        threadImpl.start();
 
-            // JRUBY-2380, associate future early so it shows up in Thread.list right away, in case it doesn't run immediately
-            runtime.getThreadService().associateThread(futureThread.getFuture(), this);
-        } else {
-            Thread thread = new Thread(runnable);
-            thread.setDaemon(true);
-            threadImpl = new NativeThread(this, thread);
-
-            // set to default thread group
-            runtime.getDefaultThreadGroup().addDirectly(this);
-
-            threadImpl.start();
-
-            // JRUBY-2380, associate thread early so it shows up in Thread.list right away, in case it doesn't run immediately
-            runtime.getThreadService().associateThread(thread, this);
-        }
+        // JRUBY-2380, associate thread early so it shows up in Thread.list right away, in case it doesn't run immediately
+        runtime.getThreadService().associateThread(thread, this);
         
         // We yield here to hopefully permit the target thread to schedule
         // MRI immediately schedules it, so this is close but not exact
@@ -736,7 +715,7 @@ public class RubyThread extends RubyObject {
     }
 
     private boolean isSleeping() {
-        return isStopped || (currentSelector != null && currentSelector.isOpen()) || blockingIO != null || currentWaitObject != null;
+        return isStopped || currentWaitObject != null;
     }
 
     public void enterSleep() {
@@ -841,113 +820,14 @@ public class RubyThread extends RubyObject {
         return receiver.getRuntime().getThreadService().getMainThread();
     }
     
-    private volatile Selector currentSelector;
     private volatile Object currentWaitObject;
     
-    @Deprecated
-    public boolean selectForAccept(RubyIO io) {
-        return select(io, SelectionKey.OP_ACCEPT);
-    }
-    
-    public boolean select(RubyIO io, int ops) {
-        Channel channel = io.getChannel();
-        
-        if (channel instanceof SelectableChannel) {
-            SelectableChannel selectable = (SelectableChannel)channel;
-            
-            synchronized (selectable.blockingLock()) {
-                boolean oldBlocking = selectable.isBlocking();
-
-                try {
-                    selectable.configureBlocking(false);
-                    
-                    io.addBlockingThread(this);
-                    currentSelector = selectable.provider().openSelector();
-
-                    SelectionKey key = selectable.register(currentSelector, ops);
-
-                    int result = currentSelector.select();
-
-                    // check for thread events, in case we've been woken up to die
-                    pollThreadEvents();
-
-                    if (result == 1) {
-                        Set<SelectionKey> keySet = currentSelector.selectedKeys();
-
-                        if (keySet.iterator().next() == key) {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                } catch (IOException ioe) {
-                    throw io.getRuntime().newRuntimeError("Error with selector: " + ioe);
-                } finally {
-                    if (currentSelector != null) {
-                        try {
-                            currentSelector.close();
-                        } catch (IOException ioe) {
-                            throw io.getRuntime().newRuntimeError("Could not close selector");
-                        }
-                    }
-                    currentSelector = null;
-                    io.removeBlockingThread(this);
-                    try {
-                        selectable.configureBlocking(oldBlocking);
-                    } catch (IOException ioe) {
-                        // ignore; I don't like doing it, but it seems like we
-                        // really just need to make all channels non-blocking by
-                        // default and use select when implementing blocking ops,
-                        // so if this remains set non-blocking, perhaps it's not
-                        // such a big deal...
-                    }
-                }
-            }
-        } else {
-            // can't select, just have to do a blocking call
-            return true;
-        }
-    }
-    
     public void interrupt() {
-        Selector selector = currentSelector;
-        if (selector != null) {
-            selector.wakeup();
-        }
-        BlockingIO.Condition iowait = blockingIO;
-        if (iowait != null) {
-            iowait.cancel();
-        }
         Object object = currentWaitObject;
         if (object != null) {
             synchronized (object) {
                 object.notify();
             }
-        }
-    }
-    private volatile BlockingIO.Condition blockingIO = null;
-    public boolean waitForIO(ThreadContext context, RubyIO io, int ops) {
-        Channel channel = io.getChannel();
-
-        if (!(channel instanceof SelectableChannel)) {
-            return true;
-        }
-        try {
-            io.addBlockingThread(this);
-            blockingIO = BlockingIO.newCondition(channel, ops);
-            boolean ready = blockingIO.await();
-            
-            // check for thread events, in case we've been woken up to die
-            pollThreadEvents();
-            return ready;
-        } catch (IOException ioe) {
-            throw context.getRuntime().newRuntimeError("Error with selector: " + ioe);
-        } catch (InterruptedException ex) {
-            // FIXME: not correct exception
-            throw context.getRuntime().newRuntimeError("Interrupted");
-        } finally {
-            blockingIO = null;
-            io.removeBlockingThread(this);
         }
     }
     public void beforeBlockingCall() {

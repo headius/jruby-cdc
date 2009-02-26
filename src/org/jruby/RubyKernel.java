@@ -42,7 +42,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Random;
@@ -53,7 +52,6 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyModule;
 
 import org.jruby.ast.util.ArgsUtil;
-import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.MainExitException;
@@ -70,8 +68,8 @@ import static org.jruby.runtime.Visibility.*;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.IAutoloadMethod;
 import org.jruby.runtime.load.LoadService;
+import org.jruby.util.ByteList;
 import org.jruby.util.IdUtil;
-import org.jruby.util.ShellLauncher;
 import org.jruby.util.TypeConverter;
 
 /**
@@ -185,32 +183,6 @@ public class RubyKernel {
         throw new RaiseException((RubyException)exc.newInstance(context, exArgs, Block.NULL_BLOCK));
     }
 
-    @JRubyMethod(name = "open", required = 1, optional = 2, frame = true, module = true, visibility = PRIVATE)
-    public static IRubyObject open(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
-        String arg = args[0].convertToString().toString();
-        Ruby runtime = context.getRuntime();
-
-        if (arg.startsWith("|")) {
-            String command = arg.substring(1);
-            // exec process, create IO with process
-            return RubyIO.popen(context, runtime.getIO(), new IRubyObject[] {runtime.newString(command)}, block);
-        } 
-
-        return RubyFile.open(context, runtime.getFile(), args, block);
-    }
-
-    @JRubyMethod(name = "getc", module = true, visibility = PRIVATE)
-    public static IRubyObject getc(ThreadContext context, IRubyObject recv) {
-        context.getRuntime().getWarnings().warn(ID.DEPRECATED_METHOD, "getc is obsolete; use STDIN.getc instead", "getc", "STDIN.getc");
-        IRubyObject defin = context.getRuntime().getGlobalVariables().get("$stdin");
-        return defin.callMethod(context, "getc");
-    }
-
-    @JRubyMethod(name = "gets", optional = 1, module = true, visibility = PRIVATE)
-    public static IRubyObject gets(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        return RubyArgsFile.gets(context, context.getRuntime().getGlobalVariables().get("$<"), args);
-    }
-
     @JRubyMethod(name = "abort", optional = 1, module = true, visibility = PRIVATE)
     public static IRubyObject abort(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         if(args.length == 1) {
@@ -306,56 +278,50 @@ public class RubyKernel {
         return TypeConverter.convertToType(object, context.getRuntime().getString(), "to_s");
     }
 
-    @JRubyMethod(name = "p", rest = true, module = true, visibility = PRIVATE)
-    public static IRubyObject p(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        Ruby runtime = context.getRuntime();
-        IRubyObject defout = runtime.getGlobalVariables().get("$>");
-
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] != null) {
-                defout.callMethod(context, "write", RubyObject.inspect(context, args[i]));
-                defout.callMethod(context, "write", runtime.newString("\n"));
-            }
-        }
-
-        IRubyObject result = runtime.getNil();
-        if (runtime.is1_9()) {
-            if (args.length == 1) {
-                result = args[0];
-            } else if (args.length > 1) {
-                result = runtime.newArray(args);
-            }
-        }
-
-        if (defout instanceof RubyFile) {
-            ((RubyFile)defout).flush();
-        }
-
-        return result;
-    }
-
     /** rb_f_putc
      */
     @JRubyMethod(name = "putc", required = 1, module = true, visibility = PRIVATE)
     public static IRubyObject putc(ThreadContext context, IRubyObject recv, IRubyObject ch) {
-        IRubyObject defout = context.getRuntime().getGlobalVariables().get("$>");
-        return defout.callMethod(context, "putc", ch);
+        return RubyFixnum.newFixnum(context.getRuntime(), writeBytes(ch));
+    }
+
+    private static int writeBytes(IRubyObject str) {
+        ByteList byteList = str.asString().getByteList();
+        System.out.write(byteList.bytes, byteList.begin, byteList.realSize);
+        return byteList.realSize;
+    }
+
+    private static int writeChar(char ch) {
+        System.out.write(ch);
+        return 1;
     }
 
     @JRubyMethod(name = "puts", rest = true, module = true, visibility = PRIVATE)
     public static IRubyObject puts(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        IRubyObject defout = context.getRuntime().getGlobalVariables().get("$>");
-        
-        defout.callMethod(context, "puts", args);
+        for (IRubyObject obj : args) {
+            writeBytes(obj);
+            writeChar('\n');
+        }
+
+        return context.getRuntime().getNil();
+    }
+
+    @JRubyMethod(name = "p", rest = true, module = true, visibility = PRIVATE)
+    public static IRubyObject p(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
+        for (IRubyObject obj : args) {
+            writeBytes(obj.inspect());
+            writeChar('\n');
+        }
 
         return context.getRuntime().getNil();
     }
 
     @JRubyMethod(name = "print", rest = true, module = true, visibility = PRIVATE)
     public static IRubyObject print(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        IRubyObject defout = context.getRuntime().getGlobalVariables().get("$>");
-
-        defout.callMethod(context, "print", args);
+        for (IRubyObject obj : args) {
+            writeBytes(obj);
+            writeChar('\n');
+        }
 
         return context.getRuntime().getNil();
     }
@@ -374,20 +340,6 @@ public class RubyKernel {
         }
 
         return context.getRuntime().getNil();
-    }
-
-    @JRubyMethod(name = "readline", optional = 1, module = true, visibility = PRIVATE)
-    public static IRubyObject readline(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        IRubyObject line = gets(context, recv, args);
-
-        if (line.isNil()) throw context.getRuntime().newEOFError();
-
-        return line;
-    }
-
-    @JRubyMethod(name = "readlines", optional = 1, module = true, visibility = PRIVATE)
-    public static IRubyObject readlines(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        return RubyArgsFile.readlines(context, context.getRuntime().getGlobalVariables().get("$<"), args);
     }
 
     /** Returns value of $_.
@@ -623,11 +575,6 @@ public class RubyKernel {
     @JRubyMethod(name = "scan", required = 1, frame = true, module = true, visibility = PRIVATE, reads = {LASTLINE, BACKREF}, writes = {LASTLINE, BACKREF}, compat = CompatVersion.RUBY1_8)
     public static IRubyObject scan(ThreadContext context, IRubyObject recv, IRubyObject pattern, Block block) {
         return getLastlineString(context, context.getRuntime()).scan(context, pattern, block);
-    }
-
-    @JRubyMethod(name = "select", required = 1, optional = 3, module = true, visibility = PRIVATE)
-    public static IRubyObject select(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        return RubyIO.select_static(context, context.getRuntime(), args);
     }
 
     @JRubyMethod(name = "sleep", optional = 1, module = true, visibility = PRIVATE)
@@ -1087,123 +1034,6 @@ public class RubyKernel {
         }
     }
     
-    @JRubyMethod(name = "test", required = 2, optional = 1, module = true, visibility = PRIVATE)
-    public static IRubyObject test(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        if (args.length == 0) throw context.getRuntime().newArgumentError("wrong number of arguments");
-
-        int cmd;
-        if (args[0] instanceof RubyFixnum) {
-            cmd = (int)((RubyFixnum) args[0]).getLongValue();
-        } else if (args[0] instanceof RubyString &&
-                ((RubyString) args[0]).getByteList().length() > 0) {
-            // MRI behavior: use first byte of string value if len > 0
-            cmd = ((RubyString) args[0]).getByteList().charAt(0);
-        } else {
-            cmd = (int) args[0].convertToInteger().getLongValue();
-        }
-        
-        // MRI behavior: raise ArgumentError for 'unknown command' before
-        // checking number of args.
-        switch(cmd) {
-        case 'A': case 'b': case 'c': case 'C': case 'd': case 'e': case 'f': case 'g': case 'G': 
-        case 'k': case 'M': case 'l': case 'o': case 'O': case 'p': case 'r': case 'R': case 's':
-        case 'S': case 'u': case 'w': case 'W': case 'x': case 'X': case 'z': case '=': case '<':
-        case '>': case '-':
-            break;
-        default:
-            throw context.getRuntime().newArgumentError("unknown command ?" + (char) cmd);
-        }
-
-        // MRI behavior: now check arg count
-
-        switch(cmd) {
-        case '-': case '=': case '<': case '>':
-            if (args.length != 3) throw context.getRuntime().newArgumentError(args.length, 3);
-            break;
-        default:
-            if (args.length != 2) throw context.getRuntime().newArgumentError(args.length, 2);
-            break;
-        }
-        
-        switch (cmd) {
-        case 'A': // ?A  | Time    | Last access time for file1
-            return context.getRuntime().newFileStat(args[1].convertToString().toString(), false).atime();
-        case 'b': // ?b  | boolean | True if file1 is a block device
-            return RubyFileTest.blockdev_p(recv, args[1]);
-        case 'c': // ?c  | boolean | True if file1 is a character device
-            return RubyFileTest.chardev_p(recv, args[1]);
-        case 'C': // ?C  | Time    | Last change time for file1
-            return context.getRuntime().newFileStat(args[1].convertToString().toString(), false).ctime();
-        case 'd': // ?d  | boolean | True if file1 exists and is a directory
-            return RubyFileTest.directory_p(recv, args[1]);
-        case 'e': // ?e  | boolean | True if file1 exists
-            return RubyFileTest.exist_p(recv, args[1]);
-        case 'f': // ?f  | boolean | True if file1 exists and is a regular file
-            return RubyFileTest.file_p(recv, args[1]);
-        case 'g': // ?g  | boolean | True if file1 has the \CF{setgid} bit
-            return RubyFileTest.setgid_p(recv, args[1]);
-        case 'G': // ?G  | boolean | True if file1 exists and has a group ownership equal to the caller's group
-            return RubyFileTest.grpowned_p(recv, args[1]);
-        case 'k': // ?k  | boolean | True if file1 exists and has the sticky bit set
-            return RubyFileTest.sticky_p(recv, args[1]);
-        case 'M': // ?M  | Time    | Last modification time for file1
-            return context.getRuntime().newFileStat(args[1].convertToString().toString(), false).mtime();
-        case 'l': // ?l  | boolean | True if file1 exists and is a symbolic link
-            return RubyFileTest.symlink_p(recv, args[1]);
-        case 'o': // ?o  | boolean | True if file1 exists and is owned by the caller's effective uid
-            return RubyFileTest.owned_p(recv, args[1]);
-        case 'O': // ?O  | boolean | True if file1 exists and is owned by the caller's real uid 
-            return RubyFileTest.rowned_p(recv, args[1]);
-        case 'p': // ?p  | boolean | True if file1 exists and is a fifo
-            return RubyFileTest.pipe_p(recv, args[1]);
-        case 'r': // ?r  | boolean | True if file1 is readable by the effective uid/gid of the caller
-            return RubyFileTest.readable_p(recv, args[1]);
-        case 'R': // ?R  | boolean | True if file is readable by the real uid/gid of the caller
-            // FIXME: Need to implement an readable_real_p in FileTest
-            return RubyFileTest.readable_p(recv, args[1]);
-        case 's': // ?s  | int/nil | If file1 has nonzero size, return the size, otherwise nil
-            return RubyFileTest.size_p(recv, args[1]);
-        case 'S': // ?S  | boolean | True if file1 exists and is a socket
-            return RubyFileTest.socket_p(recv, args[1]);
-        case 'u': // ?u  | boolean | True if file1 has the setuid bit set
-            return RubyFileTest.setuid_p(recv, args[1]);
-        case 'w': // ?w  | boolean | True if file1 exists and is writable by effective uid/gid
-            return RubyFileTest.writable_p(recv, args[1]);
-        case 'W': // ?W  | boolean | True if file1 exists and is writable by the real uid/gid
-            // FIXME: Need to implement an writable_real_p in FileTest
-            return RubyFileTest.writable_p(recv, args[1]);
-        case 'x': // ?x  | boolean | True if file1 exists and is executable by the effective uid/gid
-            return RubyFileTest.executable_p(recv, args[1]);
-        case 'X': // ?X  | boolean | True if file1 exists and is executable by the real uid/gid
-            return RubyFileTest.executable_real_p(recv, args[1]);
-        case 'z': // ?z  | boolean | True if file1 exists and has a zero length
-            return RubyFileTest.zero_p(recv, args[1]);
-        case '=': // ?=  | boolean | True if the modification times of file1 and file2 are equal
-            return context.getRuntime().newFileStat(args[1].convertToString().toString(), false).mtimeEquals(args[2]);
-        case '<': // ?<  | boolean | True if the modification time of file1 is prior to that of file2
-            return context.getRuntime().newFileStat(args[1].convertToString().toString(), false).mtimeLessThan(args[2]);
-        case '>': // ?>  | boolean | True if the modification time of file1 is after that of file2
-            return context.getRuntime().newFileStat(args[1].convertToString().toString(), false).mtimeGreaterThan(args[2]);
-        case '-': // ?-  | boolean | True if file1 and file2 are identical
-            return RubyFileTest.identical_p(recv, args[1], args[2]);
-        default:
-            throw new InternalError("unreachable code reached!");
-        }
-    }
-
-    @JRubyMethod(name = "`", required = 1, module = true, visibility = PRIVATE)
-    public static IRubyObject backquote(ThreadContext context, IRubyObject recv, IRubyObject aString) {
-        Ruby runtime = context.getRuntime();
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        
-        RubyString string = aString.convertToString();
-        int resultCode = ShellLauncher.runAndWait(runtime, new IRubyObject[] {string}, output);
-        
-        runtime.getGlobalVariables().set("$?", RubyProcess.RubyStatus.newProcessStatus(runtime, resultCode));
-        
-        return RubyString.newStringNoCopy(runtime, output.toByteArray());
-    }
-    
     @JRubyMethod(name = "srand", module = true, visibility = PRIVATE)
     public static RubyInteger srand(ThreadContext context, IRubyObject recv) {
         Ruby runtime = context.getRuntime();
@@ -1259,90 +1089,9 @@ public class RubyKernel {
         return runtime.newFixnum(random.nextInt((int) ceil));
     }
 
-    @JRubyMethod(name = "spawn", required = 1, rest = true, module = true, visibility = PRIVATE, compat = CompatVersion.RUBY1_9)
-    public static RubyFixnum spawn(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        Ruby runtime = context.getRuntime();
-        long pid = ShellLauncher.runWithoutWait(runtime, args);
-        return RubyFixnum.newFixnum(runtime, pid);
-    }
-
     @JRubyMethod(name = "syscall", required = 1, optional = 9, module = true, visibility = PRIVATE)
     public static IRubyObject syscall(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         throw context.getRuntime().newNotImplementedError("Kernel#syscall is not implemented in JRuby");
-    }
-
-    @JRubyMethod(name = "system", required = 1, rest = true, module = true, visibility = PRIVATE)
-    public static RubyBoolean system(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        Ruby runtime = context.getRuntime();
-        int resultCode;
-        try {
-            resultCode = ShellLauncher.runAndWait(runtime, args);
-        } catch (Exception e) {
-            resultCode = 127;
-        }
-        runtime.getGlobalVariables().set("$?", RubyProcess.RubyStatus.newProcessStatus(runtime, resultCode));
-        return runtime.newBoolean(resultCode == 0);
-    }
-    
-    @JRubyMethod(name = {"exec"}, required = 1, rest = true, module = true, visibility = PRIVATE)
-    public static IRubyObject exec(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
-        Ruby runtime = context.getRuntime();
-
-        // This is a fairly specific hack for empty string, but it does the job
-        if (args.length == 1 && args[0].convertToString().isEmpty()) {
-            throw runtime.newErrnoENOENTError(args[0].convertToString().toString());
-        }
-        
-        int resultCode;
-        try {
-            // TODO: exec should replace the current process.
-            // This could be possible with JNA. 
-            resultCode = ShellLauncher.execAndWait(runtime, args);
-        } catch (Exception e) {
-            throw runtime.newErrnoENOENTError("cannot execute");
-        }
-        
-        exit(runtime, new IRubyObject[] {runtime.newFixnum(resultCode)}, true);
-
-        // not reached
-        return runtime.getNil();
-    }
-
-    @JRubyMethod(name = "fork", module = true, visibility = PRIVATE)
-    public static IRubyObject fork(ThreadContext context, IRubyObject recv, Block block) {
-        Ruby runtime = context.getRuntime();
-        
-        if (!RubyInstanceConfig.FORK_ENABLED) {
-            throw runtime.newNotImplementedError("fork is unsafe and disabled by default on JRuby");
-        }
-        
-        if (block.isGiven()) {
-            int pid = runtime.getPosix().fork();
-            
-            if (pid == 0) {
-                try {
-                    block.yield(context, runtime.getNil());
-                } catch (RaiseException re) {
-                    if (re.getException() instanceof RubySystemExit) {
-                        throw re;
-                    }
-                    return exit_bang(recv, new IRubyObject[] {RubyFixnum.minus_one(runtime)});
-                } catch (Throwable t) {
-                    return exit_bang(recv, new IRubyObject[] {RubyFixnum.minus_one(runtime)});
-                }
-                return exit_bang(recv, new IRubyObject[] {RubyFixnum.zero(runtime)});
-            } else {
-                return runtime.newFixnum(pid);
-            }
-        } else {
-            int result = runtime.getPosix().fork();
-        
-            if (result == -1) {
-                return runtime.getNil();
-            }
-
-            return runtime.newFixnum(result);
-        }
     }
 
     @JRubyMethod(frame = true, module = true, compat = CompatVersion.RUBY1_9)

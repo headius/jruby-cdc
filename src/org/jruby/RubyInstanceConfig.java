@@ -197,16 +197,6 @@ public class RubyInstanceConfig {
     public static boolean FASTSEND_COMPILE_ENABLED =
             SafePropertyAccessor.getBoolean("jruby.compile.fastsend");
     public static boolean LAZYHANDLES_COMPILE = SafePropertyAccessor.getBoolean("jruby.compile.lazyHandles", false);
-    public static final boolean FORK_ENABLED
-            = SafePropertyAccessor.getBoolean("jruby.fork.enabled");
-    public static final boolean POOLING_ENABLED
-            = SafePropertyAccessor.getBoolean("jruby.thread.pool.enabled");
-    public static final int POOL_MAX
-            = SafePropertyAccessor.getInt("jruby.thread.pool.max", Integer.MAX_VALUE);
-    public static final int POOL_MIN
-            = SafePropertyAccessor.getInt("jruby.thread.pool.min", 0);
-    public static final int POOL_TTL
-            = SafePropertyAccessor.getInt("jruby.thread.pool.ttl", 60);
 
     public static final boolean NATIVE_NET_PROTOCOL
             = SafePropertyAccessor.getBoolean("jruby.native.net.protocol", false);
@@ -216,7 +206,6 @@ public class RubyInstanceConfig {
 
     public static final String COMPILE_EXCLUDE
             = SafePropertyAccessor.getProperty("jruby.jit.exclude");
-    public static boolean nativeEnabled = true;
 
     public static interface LoadServiceCreator {
         LoadService create(Ruby runtime);
@@ -238,11 +227,7 @@ public class RubyInstanceConfig {
             if (specVersion == null) {
                 specVersion = System.getProperty("java.specification.version");
             }
-            if (System.getProperty("jruby.native.enabled") != null) {
-                nativeEnabled = Boolean.getBoolean("jruby.native.enabled");
-            }
         } catch (SecurityException se) {
-            nativeEnabled = false;
             specVersion = "1.5";
         }
         
@@ -327,10 +312,6 @@ public class RubyInstanceConfig {
 
         // default ClassCache using jitMax as a soft upper bound
         classCache = new ClassCache<Script>(loader, jitMax);
-
-        if (FORK_ENABLED) {
-            error.print("WARNING: fork is highly unlikely to be safe or stable on the JVM. Have fun!\n");
-        }
     }
 
     public LoadServiceCreator getLoadServiceCreator() {
