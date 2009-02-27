@@ -269,9 +269,10 @@
   </target>
 
   <path id="lib.classpath">
-    <pathelement location="${build.lib.dir}/retroweaver-rt-2.0.5.jar"/>
+    <pathelement location="${build.lib.dir}/retroweaver-rt-2.0.7.jar"/>
     <pathelement location="${build.lib.dir}/backport-util-concurrent.jar"/>
     <pathelement location="/usr/java/j2sdk1.4.2_16/jre/lib/rt.jar" />
+    <pathelement location="/System/Library/Frameworks/JavaVM.framework/Versions/1.4.2/Classes/classes.jar" />
     <pathelement location="${lib.dir}/bsf.jar" />
   </path>
 
@@ -287,7 +288,7 @@
       <taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask" classpath="${build.lib.dir}/jarjar-1.0rc8.jar"/>
       <jarjar destfile="${lib.dir}/jruby.jar">
         <zipfileset src="${lib.dir}/jruby-weaved.jar"/>
-        <zipfileset src="${build.lib.dir}/retroweaver-rt-2.0.5.jar"/>
+        <zipfileset src="${build.lib.dir}/retroweaver-rt-2.0.7.jar"/>
         <zipfileset src="${build.lib.dir}/backport-util-concurrent.jar"/>
         <rule pattern="edu.emory.mathcs.backport.**" result="jruby.backport.@1"/>
         <rule pattern="org.objectweb.asm.**" result="jruby.objectweb.asm.@1"/>
