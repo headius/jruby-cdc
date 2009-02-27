@@ -71,7 +71,6 @@ import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.KCode;
-import org.jruby.util.Pack;
 import org.jruby.util.Sprintf;
 import org.jruby.util.StringSupport;
 import org.jruby.util.TypeConverter;
@@ -517,56 +516,56 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         return p;
     }
 
-    private static void checkUnicodeRange(Ruby runtime, int code, ByteList str, ErrorMode mode) {
-        // Unicode is can be only 21 bits long, int is enough
-        if ((0xd800 <= code && code <= 0xdfff) /* Surrogates */ || 0x10ffff < code) {
-            raisePreprocessError(runtime, str, "invalid Unicode range", mode);
-        }
-    }
+//    private static void checkUnicodeRange(Ruby runtime, int code, ByteList str, ErrorMode mode) {
+//        // Unicode is can be only 21 bits long, int is enough
+//        if ((0xd800 <= code && code <= 0xdfff) /* Surrogates */ || 0x10ffff < code) {
+//            raisePreprocessError(runtime, str, "invalid Unicode range", mode);
+//        }
+//    }
 
-    private static void appendUtf8(Ruby runtime, ByteList to, int code, Encoding[]enc, ByteList str, ErrorMode mode) {
-        checkUnicodeRange(runtime, code, str, mode);
-
-        if (code < 0x80) {
-            Sprintf.sprintf(runtime, to, "\\x%02X", code);
-        } else {
-            to.ensure(to.realSize + 6);
-            to.realSize += Pack.utf8Decode(runtime, to.bytes, to.begin + to.realSize, code);
-            if (enc[0] == null) {
-                enc[0] = UTF8Encoding.INSTANCE;
-            } else if (!(enc[0] instanceof UTF8Encoding)) { // do not load the class if not used
-                raisePreprocessError(runtime, str, "UTF-8 character in non UTF-8 regexp", mode);
-            }
-        }
-    }
+//    private static void appendUtf8(Ruby runtime, ByteList to, int code, Encoding[]enc, ByteList str, ErrorMode mode) {
+//        checkUnicodeRange(runtime, code, str, mode);
+//
+//        if (code < 0x80) {
+//            Sprintf.sprintf(runtime, to, "\\x%02X", code);
+//        } else {
+//            to.ensure(to.realSize + 6);
+//            to.realSize += Pack.utf8Decode(runtime, to.bytes, to.begin + to.realSize, code);
+//            if (enc[0] == null) {
+//                enc[0] = UTF8Encoding.INSTANCE;
+//            } else if (!(enc[0] instanceof UTF8Encoding)) { // do not load the class if not used
+//                raisePreprocessError(runtime, str, "UTF-8 character in non UTF-8 regexp", mode);
+//            }
+//        }
+//    }
     
-    private static int unescapeUnicodeList(Ruby runtime, ByteList to, byte[]bytes, int p, int end, Encoding[]encp, ByteList str, ErrorMode mode) {
-        while (p < end && ASCIIEncoding.INSTANCE.isSpace(bytes[p] & 0xff)) p++;
+//    private static int unescapeUnicodeList(Ruby runtime, ByteList to, byte[]bytes, int p, int end, Encoding[]encp, ByteList str, ErrorMode mode) {
+//        while (p < end && ASCIIEncoding.INSTANCE.isSpace(bytes[p] & 0xff)) p++;
+//
+//        boolean hasUnicode = false;
+//        while (true) {
+//            int code = StringSupport.scanHex(bytes, p, end - p);
+//            int len = StringSupport.hexLength(bytes, p, end - p);
+//            if (len == 0) break;
+//            if (len > 6) raisePreprocessError(runtime, str, "invalid Unicode range", mode);
+//            p += len;
+//            appendUtf8(runtime, to, code, encp, str, mode);
+//            hasUnicode = true;
+//            while (p < end && ASCIIEncoding.INSTANCE.isSpace(bytes[p] & 0xff)) p++;
+//        }
+//
+//        if (!hasUnicode) raisePreprocessError(runtime, str, "invalid Unicode list", mode);
+//        return p;
+//    }
 
-        boolean hasUnicode = false; 
-        while (true) {
-            int code = StringSupport.scanHex(bytes, p, end - p);
-            int len = StringSupport.hexLength(bytes, p, end - p);
-            if (len == 0) break;
-            if (len > 6) raisePreprocessError(runtime, str, "invalid Unicode range", mode);
-            p += len;
-            appendUtf8(runtime, to, code, encp, str, mode);
-            hasUnicode = true;
-            while (p < end && ASCIIEncoding.INSTANCE.isSpace(bytes[p] & 0xff)) p++;
-        }
-
-        if (!hasUnicode) raisePreprocessError(runtime, str, "invalid Unicode list", mode); 
-        return p;
-    }
-
-    private static int unescapeUnicodeBmp(Ruby runtime, ByteList to, byte[]bytes, int p, int end, Encoding[]encp, ByteList str, ErrorMode mode) {
-        if (p + 4 > end) raisePreprocessError(runtime, str, "invalid Unicode escape", mode);
-        int code = StringSupport.scanHex(bytes, p, 4);
-        int len = StringSupport.hexLength(bytes, p, 4);
-        if (len != 4) raisePreprocessError(runtime, str, "invalid Unicode escape", mode);
-        appendUtf8(runtime, to, code, encp, str, mode);
-        return p + 4;
-    }
+//    private static int unescapeUnicodeBmp(Ruby runtime, ByteList to, byte[]bytes, int p, int end, Encoding[]encp, ByteList str, ErrorMode mode) {
+//        if (p + 4 > end) raisePreprocessError(runtime, str, "invalid Unicode escape", mode);
+//        int code = StringSupport.scanHex(bytes, p, 4);
+//        int len = StringSupport.hexLength(bytes, p, 4);
+//        if (len != 4) raisePreprocessError(runtime, str, "invalid Unicode escape", mode);
+//        appendUtf8(runtime, to, code, encp, str, mode);
+//        return p + 4;
+//    }
 
     private static boolean unescapeNonAscii(Ruby runtime, ByteList to, byte[]bytes, int p, int end, Encoding enc, Encoding[]encp, ByteList str, ErrorMode mode) {
         boolean hasProperty = false;
@@ -605,16 +604,16 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
                     p = unescapeEscapedNonAscii(runtime, to, bytes, p - 2, end, enc, encp, str, mode);
                     break;
 
-                case 'u':
-                    if (p == end) raisePreprocessError(runtime, str, "too short escape sequence", mode);
-                    if (bytes[p] == (byte)'{') { /* \\u{H HH HHH HHHH HHHHH HHHHHH ...} */
-                        p++;
-                        p = unescapeUnicodeList(runtime, to, bytes, p, end, encp, str, mode);
-                        if (p == end || bytes[p++] != (byte)'}') raisePreprocessError(runtime, str, "invalid Unicode list", mode);
-                    } else { /* \\uHHHH */
-                        p = unescapeUnicodeBmp(runtime, to, bytes, p, end, encp, str, mode);
-                    }
-                    break;
+//                case 'u':
+//                    if (p == end) raisePreprocessError(runtime, str, "too short escape sequence", mode);
+//                    if (bytes[p] == (byte)'{') { /* \\u{H HH HHH HHHH HHHHH HHHHHH ...} */
+//                        p++;
+//                        p = unescapeUnicodeList(runtime, to, bytes, p, end, encp, str, mode);
+//                        if (p == end || bytes[p++] != (byte)'}') raisePreprocessError(runtime, str, "invalid Unicode list", mode);
+//                    } else { /* \\uHHHH */
+//                        p = unescapeUnicodeBmp(runtime, to, bytes, p, end, encp, str, mode);
+//                    }
+//                    break;
                 case 'p': /* \p{Hiragana} */
                     if (encp[0] == null) hasProperty = true;
                     to.append('\\').append(c);

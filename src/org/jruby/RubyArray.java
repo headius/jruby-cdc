@@ -66,7 +66,6 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.ByteList;
-import org.jruby.util.Pack;
 import org.jruby.util.Qsort;
 
 /**
@@ -3326,11 +3325,11 @@ public class RubyArray extends RubyObject implements List {
     /**
      * @see org.jruby.util.Pack#pack
      */
-    @JRubyMethod(name = "pack", required = 1)
-    public RubyString pack(ThreadContext context, IRubyObject obj) {
-        RubyString iFmt = RubyString.objAsString(context, obj);
-        return Pack.pack(getRuntime(), this, iFmt.getByteList());
-    }
+//    @JRubyMethod(name = "pack", required = 1)
+//    public RubyString pack(ThreadContext context, IRubyObject obj) {
+//        RubyString iFmt = RubyString.objAsString(context, obj);
+//        return Pack.pack(getRuntime(), this, iFmt.getByteList());
+//    }
 
     @Override
     public Class getJavaClass() {

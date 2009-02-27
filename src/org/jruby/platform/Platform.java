@@ -28,7 +28,6 @@
 
 package org.jruby.platform;
 
-import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -105,7 +104,6 @@ public class Platform {
     public static final String NAME = String.format("%s-%s", ARCH, OS);
     public static final int BIG_ENDIAN = 4321;
     public static final int LITTLE_ENDIAN = 1234;
-    public static final int BYTE_ORDER = ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN) ? BIG_ENDIAN : LITTLE_ENDIAN;
 
     public static final boolean IS_GCJ = JVM.equals(GCJ);
     

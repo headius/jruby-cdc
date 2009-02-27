@@ -86,7 +86,6 @@ import org.jruby.runtime.encoding.EncodingCapable;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.Numeric;
-import org.jruby.util.Pack;
 import org.jruby.util.Sprintf;
 import org.jruby.util.StringSupport;
 import org.jruby.util.TypeConverter;
@@ -6716,10 +6715,10 @@ public class RubyString extends RubyObject implements EncodingCapable {
     /**
      * @see org.jruby.util.Pack#unpack
      */
-    @JRubyMethod(name = "unpack")
-    public RubyArray unpack(IRubyObject obj) {
-        return Pack.unpack(getRuntime(), this.value, stringValue(obj).value);
-    }
+//    @JRubyMethod(name = "unpack")
+//    public RubyArray unpack(IRubyObject obj) {
+//        return Pack.unpack(getRuntime(), this.value, stringValue(obj).value);
+//    }
 
     public void empty() {
         value = ByteList.EMPTY_BYTELIST;
