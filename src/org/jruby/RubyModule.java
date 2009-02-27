@@ -43,8 +43,6 @@ import static org.jruby.runtime.Visibility.PRIVATE;
 import static org.jruby.runtime.Visibility.PROTECTED;
 import static org.jruby.runtime.Visibility.PUBLIC;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -57,7 +55,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.jruby.anno.JRubyClass;
-import org.jruby.anno.JRubyConstant;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.TypePopulator;
 import org.jruby.common.IRubyWarnings.ID;
