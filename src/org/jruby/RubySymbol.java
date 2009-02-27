@@ -39,8 +39,6 @@ package org.jruby;
 import static org.jruby.util.StringSupport.codeLength;
 import static org.jruby.util.StringSupport.codePoint;
 
-import java.util.concurrent.locks.ReentrantLock;
-
 import org.jcodings.Encoding;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
@@ -575,7 +573,6 @@ public class RubySymbol extends RubyObject {
         static final int MAXIMUM_CAPACITY = 1 << 30;
         static final float DEFAULT_LOAD_FACTOR = 0.75f;
         
-        private final ReentrantLock tableLock = new ReentrantLock();
         private volatile SymbolEntry[] symbolTable;
         private int size;
         private int threshold;
@@ -649,62 +646,50 @@ public class RubySymbol extends RubyObject {
             return internedName == entry.name;
         }
 
-        private RubySymbol createSymbol(String name, ByteList value, int hash, SymbolEntry[] table) {
-            ReentrantLock lock;
-            (lock = tableLock).lock();
-            try {
-                int potentialNewSize;
-                if ((potentialNewSize = size + 1) > threshold) {
-                    table = rehash();
-                } else {
-                    table = symbolTable;
-                }
-                int index;
-                // try lookup again under lock
-                for (SymbolEntry e = table[index = hash & (table.length - 1)]; e != null; e = e.next) {
-                    if (hash == e.hash && name.equals(e.name)) {
-                        return e.symbol;
-                    }
-                }
-                String internedName;
-                RubySymbol symbol = new RubySymbol(runtime, internedName = name.intern(), value);
-                table[index] = new SymbolEntry(hash, internedName, symbol, table[index]);
-                size = potentialNewSize;
-                // write-volatile
-                symbolTable = table;
-                return symbol;
-            } finally {
-                lock.unlock();
+        private synchronized RubySymbol createSymbol(String name, ByteList value, int hash, SymbolEntry[] table) {
+            int potentialNewSize;
+            if ((potentialNewSize = size + 1) > threshold) {
+                table = rehash();
+            } else {
+                table = symbolTable;
             }
+            int index;
+            // try lookup again under lock
+            for (SymbolEntry e = table[index = hash & (table.length - 1)]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) {
+                    return e.symbol;
+                }
+            }
+            String internedName;
+            RubySymbol symbol = new RubySymbol(runtime, internedName = name.intern(), value);
+            table[index] = new SymbolEntry(hash, internedName, symbol, table[index]);
+            size = potentialNewSize;
+            // write-volatile
+            symbolTable = table;
+            return symbol;
         }
 
-        private RubySymbol fastCreateSymbol(String internedName, SymbolEntry[] table) {
-            ReentrantLock lock;
-            (lock = tableLock).lock();
-            try {
-                int potentialNewSize;
-                if ((potentialNewSize = size + 1) > threshold) {
-                    table = rehash();
-                } else {
-                    table = symbolTable;
-                }
-                int index;
-                int hash;
-                // try lookup again under lock
-                for (SymbolEntry e = table[index = (hash = internedName.hashCode()) & (table.length - 1)]; e != null; e = e.next) {
-                    if (internedName == e.name) {
-                        return e.symbol;
-                    }
-                }
-                RubySymbol symbol = new RubySymbol(runtime, internedName);
-                table[index] = new SymbolEntry(hash, internedName, symbol, table[index]);
-                size = potentialNewSize;
-                // write-volatile
-                symbolTable = table;
-                return symbol;
-            } finally {
-                lock.unlock();
+        private synchronized RubySymbol fastCreateSymbol(String internedName, SymbolEntry[] table) {
+            int potentialNewSize;
+            if ((potentialNewSize = size + 1) > threshold) {
+                table = rehash();
+            } else {
+                table = symbolTable;
             }
+            int index;
+            int hash;
+            // try lookup again under lock
+            for (SymbolEntry e = table[index = (hash = internedName.hashCode()) & (table.length - 1)]; e != null; e = e.next) {
+                if (internedName == e.name) {
+                    return e.symbol;
+                }
+            }
+            RubySymbol symbol = new RubySymbol(runtime, internedName);
+            table[index] = new SymbolEntry(hash, internedName, symbol, table[index]);
+            size = potentialNewSize;
+            // write-volatile
+            symbolTable = table;
+            return symbol;
         }
         
         // backwards-compatibility, but threadsafe now

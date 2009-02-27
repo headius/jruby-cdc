@@ -2,23 +2,20 @@ package org.jruby.util;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.security.ProtectionDomain;
+import java.util.Hashtable;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A Simple cache which maintains a collection of classes that can potentially be shared among
  * multiple runtimes (or whole JVM).
  */
 public class ClassCache<T> {
-    private final AtomicInteger classLoadCount = new AtomicInteger(0);
-    private final AtomicInteger classReuseCount = new AtomicInteger(0);
+    private volatile int classLoadCount = 0;
+    private volatile int classReuseCount = 0;
     private final ReferenceQueue referenceQueue = new ReferenceQueue();
     private final Map<Object, KeyedClassReference> cache =
-        new ConcurrentHashMap<Object, KeyedClassReference>();
+        new Hashtable<Object, KeyedClassReference>();
     private final ClassLoader classLoader;
     private final int max;
     
@@ -89,12 +86,12 @@ public class ClassCache<T> {
             
             OneShotClassLoader oneShotCL = new OneShotClassLoader(getClassLoader());
             contents = (Class<T>)oneShotCL.defineClass(classGenerator.name(), classGenerator.bytecode());
-            classLoadCount.incrementAndGet();
+            classLoadCount++;
             
             cleanup();
             cache.put(key, new KeyedClassReference(key, contents, referenceQueue));
         } else {
-            classReuseCount.incrementAndGet();
+            classReuseCount++;
         }
         
         return contents;
@@ -110,7 +107,7 @@ public class ClassCache<T> {
     }
     
     public int getClassLoadCount() {
-        return classLoadCount.get();
+        return classLoadCount++;
     }
     
     public int getLiveClassCount() {
@@ -119,7 +116,7 @@ public class ClassCache<T> {
     }
     
     public int getClassReuseCount() {
-        return classReuseCount.get();
+        return classReuseCount++;
     }
     
     private void cleanup() {

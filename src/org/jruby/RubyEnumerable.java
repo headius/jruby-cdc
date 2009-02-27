@@ -31,7 +31,6 @@ import static org.jruby.RubyEnumerator.enumeratorize;
 
 import java.util.Comparator;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyModule;
 import org.jruby.common.IRubyWarnings.ID;
@@ -348,10 +347,10 @@ public class RubyEnumerable {
             final IRubyObject[][] valuesAndCriteria = new IRubyObject[selfArray.size()][2];
 
             callEach(runtime, context, self, new BlockCallback() {
-                AtomicInteger i = new AtomicInteger(0);
+                int i = 0;
 
                 public IRubyObject call(ThreadContext ctx, IRubyObject[] largs, Block blk) {
-                    IRubyObject[] myVandC = valuesAndCriteria[i.getAndIncrement()];
+                    IRubyObject[] myVandC = valuesAndCriteria[i++];
                     myVandC[0] = largs[0];
                     myVandC[1] = block.yield(ctx, largs[0]);
                     return runtime.getNil();
@@ -1108,11 +1107,11 @@ public class RubyEnumerable {
 
         if (block.isGiven()) {
             callEach(runtime, context, self, new BlockCallback() {
-                AtomicInteger ix = new AtomicInteger(0);
+                int ix = 0;
 
                 public IRubyObject call(ThreadContext ctx, IRubyObject[] largs, Block blk) {
                     RubyArray array = runtime.newArray(aLen);
-                    int myIx = ix.getAndIncrement();
+                    int myIx = ix++;
                     array.append(largs[0]);
                     for (int i = 0, j = args.length; i < j; i++) {
                         array.append(((RubyArray) args[i]).entry(myIx));
@@ -1125,12 +1124,12 @@ public class RubyEnumerable {
         } else {
             final RubyArray zip = runtime.newArray();
             callEach(runtime, context, self, new BlockCallback() {
-                AtomicInteger ix = new AtomicInteger(0);
+                int ix = 0;
 
                 public IRubyObject call(ThreadContext ctx, IRubyObject[] largs, Block blk) {
                     RubyArray array = runtime.newArray(aLen);
                     array.append(largs[0]);
-                    int myIx = ix.getAndIncrement();
+                    int myIx = ix++;
                     for (int i = 0, j = args.length; i < j; i++) {
                         array.append(((RubyArray) args[i]).entry(myIx));
                     }

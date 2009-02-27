@@ -84,15 +84,14 @@ public class RubyNativeThread extends Thread {
             synchronized (rubyThread.killLock) {
                 rubyThread.killLock.notifyAll();
             }
-        } catch (JumpException.ReturnJump rj) {
-            rubyThread.exceptionRaised(runtime.newThreadError("return can't jump across threads"));
-        } catch (RaiseException e) {
-            rubyThread.exceptionRaised(e);
-        } catch (MainExitException mee) {
-            // Someone called exit!, so we need to kill the main thread
-            runtime.getThreadService().getMainThread().kill();
+//        } catch (JumpException.ReturnJump rj) {
+//            rubyThread.exceptionRaised(runtime.newThreadError("return can't jump across threads"));
+//        } catch (RaiseException e) {
+//            rubyThread.exceptionRaised(e);
+//        } catch (MainExitException mee) {
+//            // Someone called exit!, so we need to kill the main thread
+//            runtime.getThreadService().getMainThread().kill();
         } finally {
-            runtime.getThreadService().setCritical(false);
             runtime.getThreadService().unregisterThread(rubyThread);
             
             // synchronize on the RubyThread object for threadgroup updates

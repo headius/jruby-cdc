@@ -5,10 +5,10 @@ import org.jruby.javasupport.*;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
 import org.jruby.RubyProc;
@@ -60,7 +60,7 @@ public class ConstructorInvoker extends RubyToJavaInvoker {
                 ctors = null;
 
                 // initialize cache of parameter types to method
-                cache = new ConcurrentHashMap();
+                cache = new Hashtable();
             }
             initialized = true; // write-volatile
         }

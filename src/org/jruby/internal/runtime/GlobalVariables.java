@@ -31,7 +31,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 
@@ -48,7 +48,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public class GlobalVariables {
     private Ruby runtime;
-    private Map<String, GlobalVariable> globalVariables = new ConcurrentHashMap<String, GlobalVariable>();
+    private Map<String, GlobalVariable> globalVariables = new Hashtable<String, GlobalVariable>();
 
     public GlobalVariables(Ruby runtime) {
         this.runtime = runtime;

@@ -30,7 +30,6 @@ package org.jruby.compiler;
 
 
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 import org.jruby.Ruby;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.ast.ArgsNode;
@@ -50,15 +49,15 @@ import org.jruby.util.JavaNameMangler;
 public class JITCompiler implements JITCompilerMBean {
     public static final boolean USE_CACHE = true;
     
-    private AtomicLong compiledCount = new AtomicLong(0);
-    private AtomicLong successCount = new AtomicLong(0);
-    private AtomicLong failCount = new AtomicLong(0);
-    private AtomicLong abandonCount = new AtomicLong(0);
-    private AtomicLong compileTime = new AtomicLong(0);
-    private AtomicLong averageCompileTime = new AtomicLong(0);
-    private AtomicLong codeSize = new AtomicLong(0);
-    private AtomicLong averageCodeSize = new AtomicLong(0);
-    private AtomicLong largestCodeSize = new AtomicLong(0);
+    private volatile long compiledCount = 0;
+    private volatile long successCount = 0;
+    private volatile long failCount = 0;
+    private volatile long abandonCount = 0;
+    private volatile long compileTime = 0;
+    private volatile long averageCompileTime = 0;
+    private volatile long codeSize = 0;
+    private volatile long averageCodeSize = 0;
+    private volatile long largestCodeSize = 0;
     
     public JITCompiler(Ruby ruby) {
     }
@@ -96,7 +95,7 @@ public class JITCompiler implements JITCompilerMBean {
             // The cache is full. Abandon JIT for this method and bail out.
             ClassCache classCache = instanceConfig.getClassCache();
             if (classCache.isFull()) {
-                abandonCount.incrementAndGet();
+                abandonCount++;
                 method.setCallCount(-1);
                 return null;
             }
@@ -119,13 +118,13 @@ public class JITCompiler implements JITCompilerMBean {
 
             if (sourceClass == null) {
                 // class could not be found nor generated; give up on JIT and bail out
-                failCount.incrementAndGet();
+                failCount++;
                 method.setCallCount(-1);
                 return null;
             }
 
             // successfully got back a jitted method
-            successCount.incrementAndGet();
+            successCount++;
 
             // finally, grab the script
             Script jitCompiledScript = sourceClass.newInstance();
@@ -150,7 +149,7 @@ public class JITCompiler implements JITCompilerMBean {
             t.printStackTrace();
             if (instanceConfig.isJitLoggingVerbose()) log(method, name, "could not compile", t.getMessage());
 
-            failCount.incrementAndGet();
+            failCount++;
             method.setCallCount(-1);
             return null;
         }
@@ -246,15 +245,13 @@ public class JITCompiler implements JITCompilerMBean {
                         ruby.getInstanceConfig().getJitMaxSize());
             }
             
-            compiledCount.incrementAndGet();
-            compileTime.addAndGet(System.nanoTime() - start);
-            codeSize.addAndGet(bytecode.length);
-            averageCompileTime.set(compileTime.get() / compiledCount.get());
-            averageCodeSize.set(codeSize.get() / compiledCount.get());
-            synchronized (largestCodeSize) {
-                if (largestCodeSize.get() < bytecode.length) {
-                    largestCodeSize.set(bytecode.length);
-                }
+            compiledCount++;
+            compileTime += System.nanoTime() - start;
+            codeSize += bytecode.length;
+            averageCompileTime = compileTime / compiledCount;
+            averageCodeSize = codeSize / compiledCount;
+            if (largestCodeSize < bytecode.length) {
+                largestCodeSize = bytecode.length;
             }
         }
         
@@ -300,38 +297,38 @@ public class JITCompiler implements JITCompilerMBean {
     }
 
     public long getSuccessCount() {
-        return successCount.get();
+        return successCount;
     }
 
     public long getCompileCount() {
-        return compiledCount.get();
+        return compiledCount;
     }
 
     public long getFailCount() {
-        return failCount.get();
+        return failCount;
     }
 
     public long getCompileTime() {
-        return compileTime.get() / 1000;
+        return compileTime / 1000;
     }
 
     public long getAbandonCount() {
-        return abandonCount.get();
+        return abandonCount;
     }
     
     public long getCodeSize() {
-        return codeSize.get();
+        return codeSize;
     }
     
     public long getAverageCodeSize() {
-        return averageCodeSize.get();
+        return averageCodeSize;
     }
     
     public long getAverageCompileTime() {
-        return averageCompileTime.get() / 1000;
+        return averageCompileTime / 1000;
     }
     
     public long getLargestCodeSize() {
-        return largestCodeSize.get();
+        return largestCodeSize;
     }
 }

@@ -41,7 +41,6 @@ import static org.jruby.anno.FrameField.LASTLINE;
 import java.lang.ref.SoftReference;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.jcodings.Encoding;
 import org.jcodings.specific.ASCIIEncoding;
@@ -133,22 +132,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         return pattern.getEncoding();
     }
 
-    private static final class RegexpCache {
-        private volatile SoftReference<Map<ByteList, Regex>> cache = new SoftReference<Map<ByteList, Regex>>(null);
-        private Map<ByteList, Regex> get() {
-            Map<ByteList, Regex> patternCache = cache.get();
-            if (patternCache == null) {
-                patternCache = new ConcurrentHashMap<ByteList, Regex>(5);
-                cache = new SoftReference<Map<ByteList, Regex>>(patternCache);
-            }
-            return patternCache;
-        }
-    }
-
-    private static final RegexpCache patternCache = new RegexpCache();
-    private static final RegexpCache quotedPatternCache = new RegexpCache();
-    private static final RegexpCache preprocessedPatternCache = new RegexpCache();
-
     private static Regex makeRegexp(Ruby runtime, ByteList bytes, int flags, Encoding enc) {
         try {
             int p = bytes.begin;
@@ -164,43 +147,26 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     }
 
     static Regex getRegexpFromCache(Ruby runtime, ByteList bytes, Encoding enc, int options) {
-        Map<ByteList, Regex> cache = patternCache.get();
-        Regex regex = cache.get(bytes);
-        if (regex != null && regex.getEncoding() == enc && regex.getOptions() == options) return regex;
-        regex = makeRegexp(runtime, bytes, options, enc);
-        cache.put(bytes, regex);
+        Regex regex = makeRegexp(runtime, bytes, options, enc);
         return regex;
     }
 
     static Regex getQuotedRegexpFromCache(Ruby runtime, ByteList bytes, Encoding enc, int options) {
-        Map<ByteList, Regex> cache = quotedPatternCache.get();
-        Regex regex = cache.get(bytes);
-        if (regex != null && regex.getEncoding() == enc && regex.getOptions() == options) return regex;
-        regex = makeRegexp(runtime, quote(bytes, enc), options, enc);
-        cache.put(bytes, regex);
+        Regex regex = makeRegexp(runtime, quote(bytes, enc), options, enc);
         return regex;
     }
 
     static Regex getQuotedRegexpFromCache19(Ruby runtime, ByteList bytes, int options, boolean asciiOnly) {
-        Map<ByteList, Regex> cache = quotedPatternCache.get();
-        Regex regex = cache.get(bytes);
-        Encoding enc = asciiOnly ? USASCIIEncoding.INSTANCE : bytes.encoding;
-        if (regex != null && regex.getEncoding() == enc && regex.getOptions() == options) return regex;
         ByteList quoted = quote19(bytes, asciiOnly);
-        regex = makeRegexp(runtime, quoted, options, quoted.encoding);
+        Regex regex = makeRegexp(runtime, quoted, options, quoted.encoding);
         regex.setUserObject(quoted);
-        cache.put(bytes, regex);
         return regex;
     }
 
     private static Regex getPreprocessedRegexpFromCache(Ruby runtime, ByteList bytes, Encoding enc, int options, ErrorMode mode) {
-        Map<ByteList, Regex> cache = preprocessedPatternCache.get();
-        Regex regex = cache.get(bytes);
-        if (regex != null && regex.getEncoding() == enc && regex.getOptions() == options) return regex;
         ByteList preprocessed = preprocess(runtime, bytes, enc, new Encoding[]{null}, ErrorMode.RAISE);
-        regex = makeRegexp(runtime, preprocessed, options, enc);
+        Regex regex = makeRegexp(runtime, preprocessed, options, enc);
         regex.setUserObject(preprocessed);
-        cache.put(bytes, regex);
         return regex;
     }
 

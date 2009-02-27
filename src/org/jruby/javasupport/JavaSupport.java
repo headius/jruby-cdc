@@ -35,8 +35,8 @@ package org.jruby.javasupport;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
@@ -92,8 +92,8 @@ public class JavaSupport {
     // expensive, for one; many lookups are performed when passing parameters to/from
     // methods; etc.).
     // TODO: faster custom concurrent map
-    private final ConcurrentHashMap<Class,JavaClass> javaClassCache =
-        new ConcurrentHashMap<Class, JavaClass>(128);
+    private final Map<Class,JavaClass> javaClassCache =
+        new Hashtable<Class, JavaClass>(128);
     
     // FIXME: needs to be rethought
     private final Map matchCache = Collections.synchronizedMap(new HashMap(128));

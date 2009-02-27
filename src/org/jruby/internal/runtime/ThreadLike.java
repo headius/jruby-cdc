@@ -27,8 +27,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime;
 
-import java.util.concurrent.ExecutionException;
-
 public interface ThreadLike {
     public void start();
     
@@ -36,9 +34,9 @@ public interface ThreadLike {
     
     public boolean isAlive();
     
-    public void join() throws InterruptedException, ExecutionException;
+    public void join() throws InterruptedException;
     
-    public void join(long millis) throws InterruptedException, ExecutionException;
+    public void join(long millis) throws InterruptedException;
     
     public int getPriority();
     

@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jruby.anno.JRubyMethod;
 import org.jruby.javasupport.JavaObject;
@@ -1441,11 +1440,11 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         private long id;
         private IRubyObject firstFinalizer;
         private List<IRubyObject> finalizers;
-        private AtomicBoolean finalized;
+        private volatile boolean finalized;
 
         public Finalizer(long id) {
             this.id = id;
-            this.finalized = new AtomicBoolean(false);
+            this.finalized = false;
         }
 
         public void addFinalizer(IRubyObject finalizer) {
@@ -1463,8 +1462,9 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         }
 
         @Override
-        public void finalize() {
-            if (finalized.compareAndSet(false, true)) {
+        public synchronized void finalize() {
+            if (!finalized) {
+                finalized = true;
                 if (firstFinalizer != null) callFinalizer(firstFinalizer);
                 if (finalizers != null) {
                     for (int i = 0; i < finalizers.size(); i++) {

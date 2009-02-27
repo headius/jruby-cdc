@@ -4,8 +4,6 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 
-import java.util.concurrent.locks.ReentrantLock;
-
 
 /**
  * Maps Java objects to their proxies.  Combines elements of WeakHashMap and
@@ -111,11 +109,8 @@ public abstract class ObjectProxyCache<T,A> {
                     }
                     for (int i = segments.length; --i >= 0; ) {
                         Segment<T,A> seg = segments[i];
-                        seg.lock();
-                        try {
+                        synchronized (seg) {
                             seg.expunge();
-                        } finally {
-                            seg.unlock();
                         }
                         yield();
                     }
@@ -197,12 +192,9 @@ public abstract class ObjectProxyCache<T,A> {
         for (Segment<T,A> seg : segments) {
             int ssize = 0;
             int salloc = 0;
-            seg.lock();
-            try {
+            synchronized (seg) {
                 ssize = seg.count();
                 salloc = seg.entryTable.length;
-            } finally {
-                seg.unlock();
             }
             size += ssize;
             alloc += salloc;
@@ -287,7 +279,7 @@ public abstract class ObjectProxyCache<T,A> {
     // lame generics issues: making Segment class static and manually
     // inserting cache reference to work around various problems generically
     // referencing methods/vars across classes.
-    static class Segment<T,A> extends ReentrantLock {
+    static class Segment<T,A> {
 
         final ObjectProxyCache<T,A> cache;
         final ReferenceQueue<Object> referenceQueue = new ReferenceQueue<Object>();
@@ -396,37 +388,32 @@ public abstract class ObjectProxyCache<T,A> {
             return newTable;
         }
 
-        void put(Object object, int hash, T proxy) {
-            lock();
-            try {
-                expunge();
-                Entry<T>[] table;
-                int potentialNewSize;
-                if ((potentialNewSize = tableSize + 1) > threshold) {
-                    table = rehash(); // indirect read-/write- volatile
-                } else {
-                    table = entryTable; // read-volatile
-                }
-                int index;
-                Entry<T> e;
-                for (e = table[index = hash & (table.length - 1)]; e != null; e = e.next) {
-                    if (hash == e.hash && object == e.objectRef.get()) {
-                        if (proxy == e.proxyRef.get()) return;
-                        // entry exists, proxy doesn't match. replace.
-                        // this could happen if old proxy was gc'ed
-                        // TODO: raise exception if stored proxy is non-null? (not gc'ed)
-                        remove(table, hash, e);
-                        potentialNewSize--;
-                        break;
-                    }
-                }
-                e = new Entry<T>(object, hash, proxy, cache.referenceType, table[index], referenceQueue);
-                table[index] = e;
-                tableSize = potentialNewSize;
-                entryTable = table; // write-volatile
-            } finally {
-                unlock();
+        synchronized void put(Object object, int hash, T proxy) {
+            expunge();
+            Entry<T>[] table;
+            int potentialNewSize;
+            if ((potentialNewSize = tableSize + 1) > threshold) {
+                table = rehash(); // indirect read-/write- volatile
+            } else {
+                table = entryTable; // read-volatile
             }
+            int index;
+            Entry<T> e;
+            for (e = table[index = hash & (table.length - 1)]; e != null; e = e.next) {
+                if (hash == e.hash && object == e.objectRef.get()) {
+                    if (proxy == e.proxyRef.get()) return;
+                    // entry exists, proxy doesn't match. replace.
+                    // this could happen if old proxy was gc'ed
+                    // TODO: raise exception if stored proxy is non-null? (not gc'ed)
+                    remove(table, hash, e);
+                    potentialNewSize--;
+                    break;
+                }
+            }
+            e = new Entry<T>(object, hash, proxy, cache.referenceType, table[index], referenceQueue);
+            table[index] = e;
+            tableSize = potentialNewSize;
+            entryTable = table; // write-volatile
         }
 
         T getOrCreate(Object object, int hash, A allocator) {
@@ -438,8 +425,7 @@ public abstract class ObjectProxyCache<T,A> {
                     break;
                 }
             }
-            lock();
-            try {
+            synchronized (this) {
                 expunge();
                 int potentialNewSize;
                 if ((potentialNewSize = tableSize + 1) > threshold) {
@@ -464,8 +450,6 @@ public abstract class ObjectProxyCache<T,A> {
                 tableSize = potentialNewSize;
                 entryTable = table; // write-volatile
                 return proxy;
-            } finally {
-                unlock();
             }
         }
         

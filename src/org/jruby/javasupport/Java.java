@@ -51,8 +51,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.concurrent.ConcurrentHashMap;
 
+import java.util.Hashtable;
 import org.jruby.MetaClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
@@ -1495,7 +1495,7 @@ public class Java implements Library {
 
         return JavaObject.wrap(recv.getRuntime(), Proxy.newProxyInstance(recv.getRuntime().getJRubyClassLoader(), interfaces, new InvocationHandler() {
 
-            private Map parameterTypeCache = new ConcurrentHashMap();
+            private Map parameterTypeCache = new Hashtable();
 
             public Object invoke(Object proxy, Method method, Object[] nargs) throws Throwable {
                 Class[] parameterTypes = (Class[]) parameterTypeCache.get(method);
@@ -1575,7 +1575,7 @@ public class Java implements Library {
             }
         } else {
             return JavaObject.wrap(recv.getRuntime(), Proxy.newProxyInstance(recv.getRuntime().getJRubyClassLoader(), interfaces, new InvocationHandler() {
-                private Map parameterTypeCache = new ConcurrentHashMap();
+                private Map parameterTypeCache = new Hashtable();
 
                 public Object invoke(Object proxy, Method method, Object[] nargs) throws Throwable {
                     String methodName = method.getName();
