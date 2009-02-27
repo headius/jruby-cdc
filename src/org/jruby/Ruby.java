@@ -76,7 +76,6 @@ import org.jruby.internal.runtime.GlobalVariables;
 import org.jruby.internal.runtime.ThreadService;
 import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.javasupport.JavaSupport;
-import org.jruby.management.ParserStats;
 import org.jruby.parser.EvalStaticScope;
 import org.jruby.parser.Parser;
 import org.jruby.parser.ParserConfiguration;
@@ -189,7 +188,6 @@ public final class Ruby {
         this.currentDirectory   = config.getCurrentDirectory();
         this.kcode              = config.getKCode();
         this.jitCompiler        = new JITCompiler(this);
-        this.parserStats        = new ParserStats(this);
     }
     
     /**
@@ -1787,7 +1785,6 @@ public final class Ruby {
     }
 
     public Node parseFile(InputStream in, String file, DynamicScope scope, int lineNumber) {
-        if (parserStats != null) parserStats.addLoadParse();
         return parser.parse(file, in, scope, new ParserConfiguration(getKCode(), lineNumber, false, false, true, config));
     }
     
@@ -1796,7 +1793,6 @@ public final class Ruby {
     }
 
     public Node parseInline(InputStream in, String file, DynamicScope scope) {
-        if (parserStats != null) parserStats.addEvalParse();
         return parser.parse(file, in, scope, new ParserConfiguration(getKCode(), 0, false, true, false, config));
     }
 
@@ -1809,7 +1805,6 @@ public final class Ruby {
             bytes = content.getBytes();
         }
         
-        if (parserStats != null) parserStats.addEvalParse();
         return parser.parse(file, new ByteArrayInputStream(bytes), scope, 
                 new ParserConfiguration(getKCode(), lineNumber, false, false, true, config));
     }
@@ -1830,13 +1825,11 @@ public final class Ruby {
     }
     
     public Node parseEval(ByteList content, String file, DynamicScope scope, int lineNumber) {
-        if (parserStats != null) parserStats.addEvalParse();
         return parser.parse(file, content, scope, new ParserConfiguration(getKCode(), lineNumber, false, false, true, config));
     }
 
     public Node parse(ByteList content, String file, DynamicScope scope, int lineNumber, 
             boolean extraPositionInformation) {
-        if (parserStats != null) parserStats.addJRubyModuleParse();
         return parser.parse(file, content, scope, 
                 new ParserConfiguration(getKCode(), lineNumber, extraPositionInformation, false, true, config));
     }
@@ -2908,9 +2901,6 @@ public final class Ruby {
     // Java support
     private JavaSupport javaSupport;
     private JRubyClassLoader jrubyClassLoader;
-
-    // Parser stats
-    private ParserStats parserStats;
     
     // Compilation
     private final JITCompiler jitCompiler;

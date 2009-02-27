@@ -205,19 +205,7 @@
     </java>
   </target>
 
-  <target name="_update_scm_revision_">
-      <java classname="org.jruby.Main" resultproperty="snapshot.result" errorproperty="snapshot.error" failonerror="false">
-        <classpath refid="build.classpath"/>
-        <classpath path="${jruby.classes.dir}"/>
-        <sysproperty key="jruby.home" value="${jruby.home}"/>
-        <arg value="tool/snapshot.rb"/>
-        <arg value="${jruby.classes.dir}/org/jruby/jruby.properties"/>
-      </java>
-  </target>
-
   <target name="jar-jruby" depends="generate-method-classes, generate-unsafe" unless="jar-up-to-date">
-      <antcall target="_update_scm_revision_"/>
-
       <jar destfile="${lib.dir}/jruby.jar" compress="true" index="true">
         <fileset dir="${jruby.classes.dir}"/>
         <zipfileset src="${build.lib.dir}/asm-3.0.jar"/>
@@ -226,16 +214,11 @@
         <zipfileset src="${build.lib.dir}/asm-analysis-3.0.jar"/>
         <zipfileset src="${build.lib.dir}/asm-tree-3.0.jar"/>
         <zipfileset src="${build.lib.dir}/bytelist-1.0.1.jar"/>
-        <zipfileset src="${build.lib.dir}/constantine.jar"/>
         <zipfileset src="${build.lib.dir}/jvyamlb-0.2.5.jar"/>
         <zipfileset src="${build.lib.dir}/jline-0.9.93.jar"/>
         <zipfileset src="${build.lib.dir}/jcodings.jar"/>
         <zipfileset src="${build.lib.dir}/joni.jar"/>
-        <zipfileset src="${build.lib.dir}/jna-posix.jar"/>
-        <zipfileset src="${build.lib.dir}/jna.jar"/>
-        <zipfileset src="${build.lib.dir}/jffi.jar"/>
         <zipfileset src="${build.lib.dir}/joda-time-1.5.1.jar"/>
-        <zipfileset src="${build.lib.dir}/dynalang-0.3.jar"/>
         <zipfileset src="${build.lib.dir}/yydebug.jar"/>
         <manifest>
           <attribute name="Built-By" value="${user.name}"/>
@@ -245,8 +228,6 @@
   </target>
 
   <target name="jar-jruby-dist" depends="generate-method-classes, generate-unsafe" unless="jar-up-to-date">
-      <antcall target="_update_scm_revision_"/>
-
       <taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask" classpath="${build.lib.dir}/jarjar-1.0rc8.jar"/>
       <jarjar destfile="${lib.dir}/jruby.jar" compress="true">
         <fileset dir="${jruby.classes.dir}"/>
@@ -255,17 +236,12 @@
         <zipfileset src="${build.lib.dir}/asm-util-3.0.jar"/>
         <zipfileset src="${build.lib.dir}/asm-analysis-3.0.jar"/>
         <zipfileset src="${build.lib.dir}/asm-tree-3.0.jar"/>
-        <zipfileset src="${build.lib.dir}/constantine.jar"/>
         <zipfileset src="${build.lib.dir}/bytelist-1.0.1.jar"/>
         <zipfileset src="${build.lib.dir}/jvyamlb-0.2.5.jar"/>
         <zipfileset src="${build.lib.dir}/jline-0.9.93.jar"/>
         <zipfileset src="${build.lib.dir}/jcodings.jar"/>
         <zipfileset src="${build.lib.dir}/joni.jar"/>
-        <zipfileset src="${build.lib.dir}/jna-posix.jar"/>
-        <zipfileset src="${build.lib.dir}/jna.jar"/>
-        <zipfileset src="${build.lib.dir}/jffi.jar"/>
         <zipfileset src="${build.lib.dir}/joda-time-1.5.1.jar"/>
-        <zipfileset src="${build.lib.dir}/dynalang-0.3.jar"/>
         <zipfileset src="${build.lib.dir}/yydebug.jar"/>
         <manifest>
           <attribute name="Built-By" value="${user.name}"/>
@@ -375,16 +351,11 @@
         <zipfileset src="${build.lib.dir}/asm-analysis-3.0.jar"/>
         <zipfileset src="${build.lib.dir}/asm-tree-3.0.jar"/>
         <zipfileset src="${build.lib.dir}/bytelist-1.0.1.jar"/>
-        <zipfileset src="${build.lib.dir}/constantine.jar"/>
         <zipfileset src="${build.lib.dir}/jvyamlb-0.2.5.jar"/>
         <zipfileset src="${build.lib.dir}/jline-0.9.93.jar"/>
         <zipfileset src="${build.lib.dir}/jcodings.jar"/>
         <zipfileset src="${build.lib.dir}/joni.jar"/>
-        <zipfileset src="${build.lib.dir}/jna-posix.jar"/>
-        <zipfileset src="${build.lib.dir}/jna.jar"/>
-        <zipfileset src="${build.lib.dir}/jffi.jar"/>
         <zipfileset src="${build.lib.dir}/joda-time-1.5.1.jar"/>
-        <zipfileset src="${build.lib.dir}/dynalang-0.3.jar"/>
         <zipfileset src="${build.lib.dir}/yydebug.jar"/>
         <manifest>
           <attribute name="Built-By" value="${user.name}"/>
@@ -1307,45 +1278,6 @@
 
   <target name="build-ng" depends="need-ng" if="should.build.ng">
     <exec executable="make" dir="${nailgun.home}"/>
-  </target>
-
-  <target name="jruby-nailgun" depends="generate-method-classes,build-ng"
-    description="Set up JRuby to be run with Nailgun (jruby-ng, jruby-ng-server)">
-    <mkdir dir="${build.dir}/nailmain"/>
-    <javac srcdir="${nailgun.home}/src/java" destdir="${build.dir}/nailmain"
-      classpath="${nailgun.home}/nailgun-0.7.1.jar:${jruby.classes.dir}" debug="true"
-      source="${javac.version}" target="${javac.version}"
-      deprecation="true" encoding="UTF-8" />
-    <taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask"
-      classpath="${build.lib.dir}/jarjar-1.0rc8.jar"/>
-    <jarjar destfile="${nailgun.home}/jruby-nailgun.jar">
-      <fileset dir="${jruby.classes.dir}">
-        <exclude name="org/jruby/util/ant/**/*.class"/>
-      </fileset>
-      <fileset dir="${build.dir}/nailmain"/>
-      <zipfileset src="${build.lib.dir}/asm-3.0.jar"/>
-      <zipfileset src="${build.lib.dir}/asm-commons-3.0.jar"/>
-      <zipfileset src="${build.lib.dir}/asm-util-3.0.jar"/>
-      <zipfileset src="${build.lib.dir}/asm-analysis-3.0.jar"/>
-      <zipfileset src="${build.lib.dir}/asm-tree-3.0.jar"/>
-      <zipfileset src="${build.lib.dir}/bytelist-1.0.1.jar"/>
-      <zipfileset src="${build.lib.dir}/constantine.jar"/>
-      <zipfileset src="${build.lib.dir}/jvyamlb-0.2.5.jar"/>
-      <zipfileset src="${build.lib.dir}/jline-0.9.93.jar"/>
-      <zipfileset src="${build.lib.dir}/jcodings.jar"/>
-      <zipfileset src="${build.lib.dir}/joni.jar"/>
-      <zipfileset src="${build.lib.dir}/jna-posix.jar"/>
-      <zipfileset src="${build.lib.dir}/jna.jar"/>
-      <zipfileset src="${build.lib.dir}/jffi.jar"/>
-      <zipfileset src="${build.lib.dir}/joda-time-1.5.1.jar"/>
-      <zipfileset src="${nailgun.home}/nailgun-0.7.1.jar"/>
-      <zipfileset src="${build.lib.dir}/yydebug.jar"/>
-      <rule pattern="org.objectweb.asm.**" result="jruby.objectweb.asm.@1"/>
-      <manifest>
-        <attribute name="Built-By" value="${user.name}"/>
-        <attribute name="Main-Class" value="org.jruby.Main"/>
-      </manifest>
-    </jarjar>
   </target>
 
   <target name="fetch-rails">

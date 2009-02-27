@@ -40,7 +40,6 @@ import java.util.regex.Pattern;
 import org.jruby.Ruby;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
-import org.jruby.ext.posix.util.Platform;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.load.Library;
 import org.jruby.util.NormalizedFile;
@@ -78,7 +77,7 @@ public class RbConfigLibrary implements Library {
     }
     
     public static String getOSName() {
-        String OSName = Platform.getOSName();
+        String OSName = System.getProperty("os.name");
         String theOSName = RUBY_OS_NAMES.get(OSName);
         
         return theOSName == null ? OSName : theOSName;
@@ -121,11 +120,11 @@ public class RbConfigLibrary implements Library {
 
         setConfig(configHash, "host_os", getOSName());
         setConfig(configHash, "host_vendor", System.getProperty("java.vendor"));
-        setConfig(configHash, "host_cpu", Platform.ARCH);
+        setConfig(configHash, "host_cpu", System.getProperty("os.arch"));
         
         setConfig(configHash, "target_os", getOSName());
         
-        setConfig(configHash, "target_cpu", Platform.ARCH);
+        setConfig(configHash, "target_cpu", System.getProperty("os.arch"));
         
         String jrubyJarFile = "jruby.jar";
         URL jrubyPropertiesUrl = Ruby.getClassLoader().getResource(Constants.JRUBY_PROPERTIES);
@@ -176,11 +175,7 @@ public class RbConfigLibrary implements Library {
         setConfig(configHash, "localstatedir", new NormalizedFile(normalizedHome, "var").getPath());
         setConfig(configHash, "DLEXT", "jar");
 
-        if (Platform.IS_WINDOWS) {
-            setConfig(configHash, "EXEEXT", ".exe");
-        } else {
-            setConfig(configHash, "EXEEXT", "");
-        }
+        setConfig(configHash, "EXEEXT", "");
         
         RubyHash mkmfHash = RubyHash.newHash(runtime);
         
@@ -268,12 +263,11 @@ public class RbConfigLibrary implements Library {
     }
 
     public static String jrubyScript() {
-        return System.getProperty("jruby.script", Platform.IS_WINDOWS ? "jruby.bat" : "jruby").replace('\\', '/');
+        return System.getProperty("jruby.script", "jruby").replace('\\', '/');
     }
 
-    // TODO: note lack of command.com support for Win 9x...
     public static String jrubyShell() {
-        return System.getProperty("jruby.shell", Platform.IS_WINDOWS ? "cmd.exe" : "/bin/sh").replace('\\', '/');
+        return System.getProperty("jruby.shell", "/bin/sh").replace('\\', '/');
     }
 
 }
