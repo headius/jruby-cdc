@@ -38,7 +38,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jruby.anno.JRubyClass;
-import org.jruby.anno.JRubyConstant;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
@@ -59,50 +58,27 @@ public class RubyBigDecimal extends RubyNumeric {
         }
     };
 
-    @JRubyConstant
     public final static int ROUND_DOWN = BigDecimal.ROUND_DOWN;
-    @JRubyConstant
     public final static int ROUND_CEILING = BigDecimal.ROUND_CEILING;
-    @JRubyConstant
     public final static int ROUND_UP = BigDecimal.ROUND_UP;
-    @JRubyConstant
     public final static int ROUND_HALF_DOWN = BigDecimal.ROUND_HALF_DOWN;
-    @JRubyConstant
     public final static int ROUND_HALF_EVEN = BigDecimal.ROUND_HALF_EVEN;
-    @JRubyConstant
     public final static int ROUND_HALF_UP = BigDecimal.ROUND_HALF_UP;
-    @JRubyConstant
     public final static int ROUND_FLOOR = BigDecimal.ROUND_FLOOR;
-
-    @JRubyConstant
-    public final static int SIGN_POSITIVE_INFINITE=3;
-    @JRubyConstant
-    public final static int EXCEPTION_OVERFLOW=1;
-    @JRubyConstant
-    public final static int SIGN_POSITIVE_ZERO=1;
-    @JRubyConstant
-    public final static int EXCEPTION_ALL=255;
-    @JRubyConstant
-    public final static int SIGN_NEGATIVE_FINITE=-2;
-    @JRubyConstant
-    public final static int EXCEPTION_UNDERFLOW=4;
-    @JRubyConstant
-    public final static int SIGN_NaN=0;
-    @JRubyConstant
-    public final static int BASE=10000;
-    @JRubyConstant
-    public final static int ROUND_MODE=256;
-    @JRubyConstant
-    public final static int SIGN_POSITIVE_FINITE=2;
-    @JRubyConstant
-    public final static int EXCEPTION_INFINITY=1;
-    @JRubyConstant
-    public final static int SIGN_NEGATIVE_INFINITE=-3;
-    @JRubyConstant
-    public final static int EXCEPTION_ZERODIVIDE=1;
-    @JRubyConstant
-    public final static int SIGN_NEGATIVE_ZERO=-1;
-    @JRubyConstant
+    public final static int SIGN_POSITIVE_INFINITE = 3;
+    public final static int EXCEPTION_OVERFLOW = 1;
+    public final static int SIGN_POSITIVE_ZERO = 1;
+    public final static int EXCEPTION_ALL = 255;
+    public final static int SIGN_NEGATIVE_FINITE = -2;
+    public final static int EXCEPTION_UNDERFLOW = 4;
+    public final static int SIGN_NaN = 0;
+    public final static int BASE = 10000;
+    public final static int ROUND_MODE = 256;
+    public final static int SIGN_POSITIVE_FINITE = 2;
+    public final static int EXCEPTION_INFINITY = 1;
+    public final static int SIGN_NEGATIVE_INFINITE = -3;
+    public final static int EXCEPTION_ZERODIVIDE = 1;
+    public final static int SIGN_NEGATIVE_ZERO = -1;
     public final static int EXCEPTION_NaN=2;
     
     // Static constants
@@ -121,7 +97,29 @@ public class RubyBigDecimal extends RubyNumeric {
         result.setInternalModuleVariable("vpRoundingMode", runtime.newFixnum(ROUND_HALF_UP));
         
         result.defineAnnotatedMethods(RubyBigDecimal.class);
-        result.defineAnnotatedConstants(RubyBigDecimal.class);
+
+        result.defineConstant("ROUND_DOWN", RubyFixnum.newFixnum(runtime, ROUND_DOWN));
+        result.defineConstant("ROUND_CEILING", RubyFixnum.newFixnum(runtime, ROUND_CEILING));
+        result.defineConstant("ROUND_UP", RubyFixnum.newFixnum(runtime, ROUND_UP));
+        result.defineConstant("ROUND_HALF_DOWN", RubyFixnum.newFixnum(runtime, ROUND_HALF_DOWN));
+        result.defineConstant("ROUND_HALF_EVEN", RubyFixnum.newFixnum(runtime, ROUND_HALF_EVEN));
+        result.defineConstant("ROUND_HALF_UP", RubyFixnum.newFixnum(runtime, ROUND_HALF_UP));
+        result.defineConstant("ROUND_FLOOR", RubyFixnum.newFixnum(runtime, ROUND_FLOOR));
+        result.defineConstant("SIGN_POSITIVE_INFINITE", RubyFixnum.newFixnum(runtime, SIGN_POSITIVE_INFINITE));
+        result.defineConstant("EXCEPTION_OVERFLOW", RubyFixnum.newFixnum(runtime, EXCEPTION_OVERFLOW));
+        result.defineConstant("SIGN_POSITIVE_ZERO", RubyFixnum.newFixnum(runtime, SIGN_POSITIVE_ZERO));
+        result.defineConstant("EXCEPTION_ALL", RubyFixnum.newFixnum(runtime, EXCEPTION_ALL));
+        result.defineConstant("SIGN_NEGATIVE_FINITE", RubyFixnum.newFixnum(runtime, SIGN_NEGATIVE_FINITE));
+        result.defineConstant("EXCEPTION_UNDERFLOW", RubyFixnum.newFixnum(runtime, EXCEPTION_UNDERFLOW));
+        result.defineConstant("SIGN_NaN", RubyFixnum.newFixnum(runtime, SIGN_NaN));
+        result.defineConstant("BASE", RubyFixnum.newFixnum(runtime, BASE));
+        result.defineConstant("ROUND_MODE", RubyFixnum.newFixnum(runtime, ROUND_MODE));
+        result.defineConstant("SIGN_POSITIVE_FINITE", RubyFixnum.newFixnum(runtime, SIGN_POSITIVE_FINITE));
+        result.defineConstant("EXCEPTION_INFINITY", RubyFixnum.newFixnum(runtime, EXCEPTION_INFINITY));
+        result.defineConstant("SIGN_NEGATIVE_INFINITE", RubyFixnum.newFixnum(runtime, SIGN_NEGATIVE_INFINITE));
+        result.defineConstant("EXCEPTION_ZERODIVIDE", RubyFixnum.newFixnum(runtime, EXCEPTION_ZERODIVIDE));
+        result.defineConstant("SIGN_NEGATIVE_ZERO", RubyFixnum.newFixnum(runtime, SIGN_NEGATIVE_ZERO));
+        result.defineConstant("EXCEPTION_NaN", RubyFixnum.newFixnum(runtime, EXCEPTION_NaN));
 
         return result;
     }

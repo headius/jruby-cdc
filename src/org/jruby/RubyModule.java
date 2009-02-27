@@ -44,7 +44,6 @@ import static org.jruby.runtime.Visibility.PROTECTED;
 import static org.jruby.runtime.Visibility.PUBLIC;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,10 +59,8 @@ import java.util.Set;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyConstant;
 import org.jruby.anno.JRubyMethod;
-import org.jruby.anno.JavaMethodDescriptor;
 import org.jruby.anno.TypePopulator;
 import org.jruby.common.IRubyWarnings.ID;
-import org.jruby.compiler.ASTInspector;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.methods.AliasMethod;
 import org.jruby.internal.runtime.methods.CallConfiguration;
@@ -81,7 +78,6 @@ import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
-import org.jruby.runtime.MethodFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -517,283 +513,28 @@ public class RubyModule extends RubyObject {
                 PRIVATE : PUBLIC;
         addMethod(name, new FullFunctionCallbackMethod(this, method, visibility));
     }
-    
-    public void defineAnnotatedMethod(Class clazz, String name) {
-        // FIXME: This is probably not very efficient, since it loads all methods for each call
-        boolean foundMethod = false;
-        for (Method method : clazz.getDeclaredMethods()) {
-            if (method.getName().equals(name) && defineAnnotatedMethod(method, MethodFactory.createFactory(getRuntime().getJRubyClassLoader()))) {
-                foundMethod = true;
-            }
-        }
-
-        if (!foundMethod) {
-            throw new RuntimeException("No JRubyMethod present for method " + name + "on class " + clazz.getName());
-        }
-    }
-    
-    public void defineAnnotatedConstants(Class clazz) {
-        Field[] declaredFields = clazz.getDeclaredFields();
-        for (Field field : declaredFields) {
-            if (Modifier.isStatic(field.getModifiers())) {
-                defineAnnotatedConstant(field);
-            }
-        }
-    }
-
-    public boolean defineAnnotatedConstant(Field field) {
-        JRubyConstant jrubyConstant = field.getAnnotation(JRubyConstant.class);
-
-        if (jrubyConstant == null) return false;
-
-        String[] names = jrubyConstant.value();
-        if(names.length == 0) {
-            names = new String[]{field.getName()};
-        }
-
-        Class tp = field.getType();
-        IRubyObject realVal;
-
-        try {
-            if(tp == Integer.class || tp == Integer.TYPE || tp == Short.class || tp == Short.TYPE || tp == Byte.class || tp == Byte.TYPE) {
-                realVal = RubyNumeric.int2fix(getRuntime(), field.getInt(null));
-            } else if(tp == Boolean.class || tp == Boolean.TYPE) {
-                realVal = field.getBoolean(null) ? getRuntime().getTrue() : getRuntime().getFalse();
-            } else {
-                realVal = getRuntime().getNil();
-            }
-        } catch(Exception e) {
-            realVal = getRuntime().getNil();
-        }
-
-        
-        for(String name : names) {
-            this.fastSetConstant(name, realVal);
-        }
-
-        return true;
-    }
 
     public void defineAnnotatedMethods(Class clazz) {
         defineAnnotatedMethodsIndividually(clazz);
-    }
-    
-    public static class MethodClumper {
-        Map<String, List<JavaMethodDescriptor>> annotatedMethods = new HashMap<String, List<JavaMethodDescriptor>>();
-        Map<String, List<JavaMethodDescriptor>> staticAnnotatedMethods = new HashMap<String, List<JavaMethodDescriptor>>();
-        Map<String, List<JavaMethodDescriptor>> annotatedMethods1_8 = new HashMap<String, List<JavaMethodDescriptor>>();
-        Map<String, List<JavaMethodDescriptor>> staticAnnotatedMethods1_8 = new HashMap<String, List<JavaMethodDescriptor>>();
-        Map<String, List<JavaMethodDescriptor>> annotatedMethods1_9 = new HashMap<String, List<JavaMethodDescriptor>>();
-        Map<String, List<JavaMethodDescriptor>> staticAnnotatedMethods1_9 = new HashMap<String, List<JavaMethodDescriptor>>();
-        
-        public void clump(Class cls) {
-            Method[] declaredMethods = cls.getDeclaredMethods();
-            for (Method method: declaredMethods) {
-                JRubyMethod anno = method.getAnnotation(JRubyMethod.class);
-                if (anno == null) continue;
-                
-                JavaMethodDescriptor desc = new JavaMethodDescriptor(method);
-                
-                String name = anno.name().length == 0 ? method.getName() : anno.name()[0];
-                
-                List<JavaMethodDescriptor> methodDescs;
-                Map<String, List<JavaMethodDescriptor>> methodsHash = null;
-                if (desc.isStatic) {
-                    if (anno.compat() == CompatVersion.RUBY1_8) {
-                        methodsHash = staticAnnotatedMethods1_8;
-                    } else if (anno.compat() == CompatVersion.RUBY1_9) {
-                        methodsHash = staticAnnotatedMethods1_9;
-                    } else {
-                        methodsHash = staticAnnotatedMethods;
-                    }
-                } else {
-                    if (anno.compat() == CompatVersion.RUBY1_8) {
-                        methodsHash = annotatedMethods1_8;
-                    } else if (anno.compat() == CompatVersion.RUBY1_9) {
-                        methodsHash = annotatedMethods1_9;
-                    } else {
-                        methodsHash = annotatedMethods;
-                    }
-                }
-                
-                methodDescs = methodsHash.get(name);
-                if (methodDescs == null) {
-                    methodDescs = new ArrayList<JavaMethodDescriptor>();
-                    methodsHash.put(name, methodDescs);
-                }
-                
-                methodDescs.add(desc);
-            }
-        }
-
-        public Map<String, List<JavaMethodDescriptor>> getAnnotatedMethods() {
-            return annotatedMethods;
-        }
-
-        public Map<String, List<JavaMethodDescriptor>> getAnnotatedMethods1_8() {
-            return annotatedMethods1_8;
-        }
-
-        public Map<String, List<JavaMethodDescriptor>> getAnnotatedMethods1_9() {
-            return annotatedMethods1_9;
-        }
-
-        public Map<String, List<JavaMethodDescriptor>> getStaticAnnotatedMethods() {
-            return staticAnnotatedMethods;
-        }
-
-        public Map<String, List<JavaMethodDescriptor>> getStaticAnnotatedMethods1_8() {
-            return staticAnnotatedMethods1_8;
-        }
-
-        public Map<String, List<JavaMethodDescriptor>> getStaticAnnotatedMethods1_9() {
-            return staticAnnotatedMethods1_9;
-        }
     }
     
     public void defineAnnotatedMethodsIndividually(Class clazz) {
         String x = clazz.getSimpleName();
         TypePopulator populator = null;
         
-        if (RubyInstanceConfig.FULL_TRACE_ENABLED) {
-            // we need full traces, use default (slow) populator
-            if (DEBUG) System.out.println("trace mode, using default populator");
-            populator = TypePopulator.DEFAULT;
-        } else {
-            try {
-                String qualifiedName = "org.jruby.gen." + clazz.getCanonicalName().replace('.', '$');
+        try {
+            String qualifiedName = "org.jruby.gen." + clazz.getCanonicalName().replace('.', '$');
 
-                if (DEBUG) System.out.println("looking for " + qualifiedName + "$Populator");
+            if (DEBUG) System.out.println("looking for " + qualifiedName + "$Populator");
 
-                Class populatorClass = Class.forName(qualifiedName + "$Populator");
-                populator = (TypePopulator)populatorClass.newInstance();
-            } catch (Throwable t) {
-                if (DEBUG) System.out.println("Could not find it, using default populator");
-                populator = TypePopulator.DEFAULT;
-            }
+            Class populatorClass = Class.forName(qualifiedName + "$Populator");
+            populator = (TypePopulator)populatorClass.newInstance();
+        } catch (Throwable t) {
+            if (DEBUG) System.out.println("Could not find it, using default populator");
+            throw new RuntimeException(t);
         }
         
         populator.populate(this, clazz);
-    }
-    
-    private static MethodFactory.MethodDefiningCallback methodDefiningCallback = new MethodFactory.MethodDefiningCallback() {
-        public void define(RubyModule module, JavaMethodDescriptor desc, DynamicMethod dynamicMethod) {
-            JRubyMethod jrubyMethod = desc.anno;
-            if (jrubyMethod.frame()) {
-                for (String name : jrubyMethod.name()) {
-                    ASTInspector.FRAME_AWARE_METHODS.add(name);
-                }
-            }
-            if(jrubyMethod.compat() == CompatVersion.BOTH ||
-                    module.getRuntime().getInstanceConfig().getCompatVersion() == jrubyMethod.compat()) {
-                RubyModule singletonClass;
-
-                if (jrubyMethod.meta()) {
-                    singletonClass = module.getSingletonClass();
-                    dynamicMethod.setImplementationClass(singletonClass);
-
-                    String baseName;
-                    if (jrubyMethod.name().length == 0) {
-                        baseName = desc.name;
-                        singletonClass.addMethod(baseName, dynamicMethod);
-                    } else {
-                        baseName = jrubyMethod.name()[0];
-                        for (String name : jrubyMethod.name()) {
-                            singletonClass.addMethod(name, dynamicMethod);
-                        }
-                    }
-
-                    if (jrubyMethod.alias().length > 0) {
-                        for (String alias : jrubyMethod.alias()) {
-                            singletonClass.defineAlias(alias, baseName);
-                        }
-                    }
-                } else {
-                    String baseName;
-                    if (jrubyMethod.name().length == 0) {
-                        baseName = desc.name;
-                        module.addMethod(baseName, dynamicMethod);
-                    } else {
-                        baseName = jrubyMethod.name()[0];
-                        for (String name : jrubyMethod.name()) {
-                            module.addMethod(name, dynamicMethod);
-                        }
-                    }
-
-                    if (jrubyMethod.alias().length > 0) {
-                        for (String alias : jrubyMethod.alias()) {
-                            module.defineAlias(alias, baseName);
-                        }
-                    }
-
-                    if (jrubyMethod.module()) {
-                        singletonClass = module.getSingletonClass();
-                        // module/singleton methods are all defined public
-                        DynamicMethod moduleMethod = dynamicMethod.dup();
-                        moduleMethod.setVisibility(PUBLIC);
-
-                        if (jrubyMethod.name().length == 0) {
-                            baseName = desc.name;
-                            singletonClass.addMethod(desc.name, moduleMethod);
-                        } else {
-                            baseName = jrubyMethod.name()[0];
-                            for (String name : jrubyMethod.name()) {
-                                singletonClass.addMethod(name, moduleMethod);
-                            }
-                        }
-
-                        if (jrubyMethod.alias().length > 0) {
-                            for (String alias : jrubyMethod.alias()) {
-                                singletonClass.defineAlias(alias, baseName);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    };
-    
-    public boolean defineAnnotatedMethod(String name, List<JavaMethodDescriptor> methods, MethodFactory methodFactory) {
-        JavaMethodDescriptor desc = methods.get(0);
-        if (methods.size() == 1) {
-            return defineAnnotatedMethod(desc, methodFactory);
-        } else {
-            DynamicMethod dynamicMethod = methodFactory.getAnnotatedMethod(this, methods);
-            methodDefiningCallback.define(this, desc, dynamicMethod);
-            
-            return true;
-        }
-    }
-    
-    public boolean defineAnnotatedMethod(Method method, MethodFactory methodFactory) { 
-        JRubyMethod jrubyMethod = method.getAnnotation(JRubyMethod.class);
-
-        if (jrubyMethod == null) return false;
-
-            if(jrubyMethod.compat() == CompatVersion.BOTH ||
-                    getRuntime().getInstanceConfig().getCompatVersion() == jrubyMethod.compat()) {
-            JavaMethodDescriptor desc = new JavaMethodDescriptor(method);
-            DynamicMethod dynamicMethod = methodFactory.getAnnotatedMethod(this, desc);
-            methodDefiningCallback.define(this, desc, dynamicMethod);
-
-            return true;
-        }
-        return false;
-    }
-    
-    public boolean defineAnnotatedMethod(JavaMethodDescriptor desc, MethodFactory methodFactory) { 
-        JRubyMethod jrubyMethod = desc.anno;
-
-        if (jrubyMethod == null) return false;
-
-            if(jrubyMethod.compat() == CompatVersion.BOTH ||
-                    getRuntime().getInstanceConfig().getCompatVersion() == jrubyMethod.compat()) {
-            DynamicMethod dynamicMethod = methodFactory.getAnnotatedMethod(this, desc);
-            methodDefiningCallback.define(this, desc, dynamicMethod);
-
-            return true;
-        }
-        return false;
     }
 
     public void defineFastMethod(String name, Callback method) {
