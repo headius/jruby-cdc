@@ -638,8 +638,7 @@ public class RubyInstanceConfig {
             } else {
                 try {
                     // try loading from classloader resources
-                    jrubyHome = getClass().getResource("/META-INF/jruby.home")
-                        .toURI().getSchemeSpecificPart();
+                    jrubyHome = getClass().getResource("/META-INF/jruby.home").toString();
                 } catch (Exception e) {}
 
                 if (jrubyHome != null) {

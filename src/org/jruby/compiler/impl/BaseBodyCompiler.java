@@ -2331,7 +2331,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.pushInt(scope.getRequiredArgs());
         method.pushInt(scope.getOptionalArgs());
         method.pushInt(scope.getRestArg());
-        method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
+        method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().getClass().getSimpleName(), ci(CallConfiguration.class));
 
         if (receiver != null) {
             invokeUtilityMethod("defs", sig(IRubyObject.class,

@@ -29,7 +29,6 @@
 package org.jruby.internal.runtime.methods;
 
 import java.io.PrintWriter;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
 import org.jruby.Ruby;
@@ -59,6 +58,7 @@ import org.jruby.util.JRubyClassLoader;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.util.CheckClassAdapter;
+import static org.jruby.internal.runtime.methods.CallConfiguration.*;
 
 /**
  * In order to avoid the overhead with reflection-based method handles, this
@@ -880,64 +880,55 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         mv.aload(0);
         mv.aload(THREADCONTEXT_INDEX); // tc
         
-        switch (callConfig.framing()) {
-        case Full:
+        if (callConfig.framing() == Framing.Full) {
             mv.aload(RECEIVER_INDEX); // self
             mv.aload(NAME_INDEX); // name
             loadBlockForPre(mv, specificArity, block);
-            break;
-        case Backtrace:
+        } else if (callConfig.framing() == Framing.Backtrace) {
             mv.aload(NAME_INDEX); // name
-            break;
-        case None:
-            break;
-        default: throw new RuntimeException("Unknown call configuration");
+        } else if (callConfig.framing() == Framing.None) {
+        } else {
+            throw new RuntimeException("Unknown call configuration");
         }
     }
 
     private String getPreMethod(CallConfiguration callConfig) {
-        switch (callConfig) {
-        case FrameFullScopeFull: return "preFrameAndScope";
-        case FrameFullScopeDummy: return "preFrameAndDummyScope";
-        case FrameFullScopeNone: return "preFrameOnly";
-        case FrameBacktraceScopeFull: return "preBacktraceAndScope";
-        case FrameBacktraceScopeDummy: return "preBacktraceDummyscope";
-        case FrameBacktraceScopeNone:  return "preBacktraceOnly";
-        case FrameNoneScopeFull: return "preScopeOnly";
-        case FrameNoneScopeDummy: return "preNoFrameDummyScope";
-        case FrameNoneScopeNone: return "preNoop";
-        default: throw new RuntimeException("Unknown call configuration");
-        }
+        if (callConfig.getClass() == FrameFullScopeFull.getClass()) return "preFrameAndScope";
+        if (callConfig.getClass() == FrameFullScopeDummy.getClass()) return "preFrameAndDummyScope";
+        if (callConfig.getClass() == FrameFullScopeNone.getClass()) return "preFrameOnly";
+        if (callConfig.getClass() == FrameBacktraceScopeFull.getClass()) return "preBacktraceAndScope";
+        if (callConfig.getClass() == FrameBacktraceScopeDummy.getClass()) return "preBacktraceDummyscope";
+        if (callConfig.getClass() == FrameBacktraceScopeNone.getClass()) return "preBacktraceOnly";
+        if (callConfig.getClass() == FrameNoneScopeFull.getClass()) return "preScopeOnly";
+        if (callConfig.getClass() == FrameNoneScopeDummy.getClass()) return "preNoFrameDummyScope";
+        if (callConfig.getClass() == FrameNoneScopeNone.getClass()) return "preNoop";
+        throw new RuntimeException("Unknown call configuration");
     }
 
     private String getPreSignature(CallConfiguration callConfig) {
-        switch (callConfig) {
-        case FrameFullScopeFull: return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
-        case FrameFullScopeDummy: return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
-        case FrameFullScopeNone: return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
-        case FrameBacktraceScopeFull: return sig(void.class, params(ThreadContext.class, String.class));
-        case FrameBacktraceScopeDummy: return sig(void.class, params(ThreadContext.class, String.class));
-        case FrameBacktraceScopeNone:  return sig(void.class, params(ThreadContext.class, String.class));
-        case FrameNoneScopeFull: return sig(void.class, params(ThreadContext.class));
-        case FrameNoneScopeDummy: return sig(void.class, params(ThreadContext.class));
-        case FrameNoneScopeNone: return sig(void.class);
-        default: throw new RuntimeException("Unknown call configuration");
-        }
+        if (callConfig.getClass() == FrameFullScopeFull.getClass()) return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
+        if (callConfig.getClass() == FrameFullScopeDummy.getClass()) return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
+        if (callConfig.getClass() == FrameFullScopeNone.getClass()) return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
+        if (callConfig.getClass() == FrameBacktraceScopeFull.getClass()) return sig(void.class, params(ThreadContext.class, String.class));
+        if (callConfig.getClass() == FrameBacktraceScopeDummy.getClass()) return sig(void.class, params(ThreadContext.class, String.class));
+        if (callConfig.getClass() == FrameBacktraceScopeNone.getClass()) return sig(void.class, params(ThreadContext.class, String.class));
+        if (callConfig.getClass() == FrameNoneScopeFull.getClass()) return sig(void.class, params(ThreadContext.class));
+        if (callConfig.getClass() == FrameNoneScopeDummy.getClass()) return sig(void.class, params(ThreadContext.class));
+        if (callConfig.getClass() == FrameNoneScopeNone.getClass()) return sig(void.class);
+        throw new RuntimeException("Unknown call configuration");
     }
 
     public static String getPostMethod(CallConfiguration callConfig) {
-        switch (callConfig) {
-        case FrameFullScopeFull: return "postFrameAndScope";
-        case FrameFullScopeDummy: return "postFrameAndScope";
-        case FrameFullScopeNone: return "postFrameOnly";
-        case FrameBacktraceScopeFull: return "postBacktraceAndScope";
-        case FrameBacktraceScopeDummy: return "postBacktraceDummyscope";
-        case FrameBacktraceScopeNone:  return "postBacktraceOnly";
-        case FrameNoneScopeFull: return "postScopeOnly";
-        case FrameNoneScopeDummy: return "postNoFrameDummyScope";
-        case FrameNoneScopeNone: return "postNoop";
-        default: throw new RuntimeException("Unknown call configuration");
-        }
+        if (callConfig.getClass() == FrameFullScopeFull.getClass()) return "postFrameAndScope";
+        if (callConfig.getClass() == FrameFullScopeDummy.getClass()) return "postFrameAndScope";
+        if (callConfig.getClass() == FrameFullScopeNone.getClass()) return "postFrameOnly";
+        if (callConfig.getClass() == FrameBacktraceScopeFull.getClass()) return "postBacktraceAndScope";
+        if (callConfig.getClass() == FrameBacktraceScopeDummy.getClass()) return "postBacktraceDummyscope";
+        if (callConfig.getClass() == FrameBacktraceScopeNone.getClass()) return "postBacktraceOnly";
+        if (callConfig.getClass() == FrameNoneScopeFull.getClass()) return "postScopeOnly";
+        if (callConfig.getClass() == FrameNoneScopeDummy.getClass()) return "postNoFrameDummyScope";
+        if (callConfig.getClass() == FrameNoneScopeNone.getClass()) return "postNoop";
+        throw new RuntimeException("Unknown call configuration");
     }
 
     private void loadArguments(SkinnyMethodAdapter mv, JavaMethodDescriptor desc, int specificArity) {
