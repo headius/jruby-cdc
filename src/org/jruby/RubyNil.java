@@ -175,11 +175,6 @@ public class RubyNil extends RubyObject {
     public RubyFixnum id() {
         return getRuntime().newFixnum(4);
     }
-    
-    @Override
-    public IRubyObject taint(ThreadContext context) {
-        return this;
-    }
 
     /** nilclass_to_c
      * 

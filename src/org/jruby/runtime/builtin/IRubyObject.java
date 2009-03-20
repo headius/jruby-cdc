@@ -80,25 +80,6 @@ public interface IRubyObject {
     boolean isTrue();
     
     /**
-     * RubyMethod isTaint.
-     * @return boolean
-     */
-    boolean isTaint();
-    
-    /**
-     * RubyMethod setTaint.
-     * @param b
-     */
-    void setTaint(boolean b);
-    
-    /**
-     * Infect this object using the taint of another object
-     * @param obj
-     * @return
-     */
-    IRubyObject infectBy(IRubyObject obj);
-    
-    /**
      * RubyMethod isFrozen.
      * @return boolean
      */
@@ -109,18 +90,6 @@ public interface IRubyObject {
      * @param b
      */
     void setFrozen(boolean b);
-
-    /**
-     * RubyMethod isUntrusted.
-     * @return boolean
-     */
-    boolean isUntrusted();
-
-    /**
-     * RubyMethod setUntrusted.
-     * @param b
-     */
-    void setUntrusted(boolean b);
     
     /**
      *

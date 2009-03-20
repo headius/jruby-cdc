@@ -240,7 +240,6 @@ public class RubyException extends RubyObject {
     @JRubyMethod(name = "to_s")
     public IRubyObject to_s(ThreadContext context) {
         if (message.isNil()) return context.getRuntime().newString(getMetaClass().getName());
-        message.setTaint(isTaint());
         return message;
     }
 

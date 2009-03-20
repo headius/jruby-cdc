@@ -649,7 +649,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
 
         RubyString src = args[0].convertToString();
         RubyString dst = RubyString.newStringShared(runtime, quote(src.getByteList(), code.getEncoding()));
-        dst.infectBy(src);
         return dst;
     }
 
@@ -1045,7 +1044,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
 
     private RubyRegexp initializeCommon(ByteList bytes, int options) {
         Ruby runtime = getRuntime();        
-        if (!isTaint() && runtime.getSafeLevel() >= 4) throw runtime.newSecurityError("Insecure: can't modify regexp");
         checkFrozen();
         if (isLiteral()) throw runtime.newSecurityError("can't modify literal regexp");
         setKCode(runtime, options);
@@ -1114,7 +1112,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     // rb_reg_initialize
     private RubyRegexp initializeCommon19(ByteList bytes, Encoding enc, int options) {
         Ruby runtime = getRuntime();        
-        if (!isTaint() && runtime.getSafeLevel() >= 4) throw runtime.newSecurityError("Insecure: can't modify regexp");
         checkFrozen();
         if (isLiteral()) throw runtime.newSecurityError("can't modify literal regexp");
         if (pattern != null) throw runtime.newTypeError("already initialized regexp");
@@ -1331,7 +1328,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     private RubyMatchData updateBackRef(ThreadContext context, RubyString str, Frame frame, Matcher matcher) {
         RubyMatchData match = updateBackRef(context, str, frame, matcher, pattern);
         match.regexp = this;
-        match.infectBy(this);
         return match;
     }
 
@@ -1344,7 +1340,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
             frame.setBackRef(match);
         } else {
             match = (RubyMatchData)backref;
-            match.setTaint(runtime.getSafeLevel() >= 3);
         }
 
         match.regs = matcher.getRegion(); // lazy, null when no groups defined
@@ -1353,7 +1348,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         match.pattern = pattern;
         match.str = (RubyString)str.strDup(runtime).freeze(context);
 
-        match.infectBy(str);
         return match;
     }
 
@@ -1402,7 +1396,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     public IRubyObject source() {
         check();
         RubyString str = RubyString.newStringShared(getRuntime(), this.str);
-        if (isTaint()) str.setTaint(true);
         return str;
     }
 
@@ -1511,7 +1504,7 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
             result.append((byte)':');
             appendRegexpString(getRuntime(), result, bytes, p, len, kcode.getEncoding());
             result.append((byte)')');
-            return RubyString.newString(getRuntime(), result).infectBy(this);
+            return RubyString.newString(getRuntime(), result);
         } while (true);
     }
 
@@ -1698,7 +1691,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         if (start == -1) return match.getRuntime().getNil();
 
         RubyString str = m.str.makeShared(match.getRuntime(), start, end - start);
-        str.infectBy(m);
         return str;
     }
 
@@ -1716,7 +1708,7 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         if (match.isNil()) return match;
         RubyMatchData m = (RubyMatchData)match;
         if (m.begin == -1) match.getRuntime().getNil(); 
-        return m.str.makeShared(match.getRuntime(), 0,  m.begin).infectBy(m);
+        return m.str.makeShared(match.getRuntime(), 0,  m.begin);
     }
 
     /** rb_reg_match_post
@@ -1726,7 +1718,7 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         if (match.isNil()) return match;
         RubyMatchData m = (RubyMatchData)match;
         if (m.begin == -1) return match.getRuntime().getNil();
-        return m.str.makeShared(match.getRuntime(), m.end, m.str.getByteList().realSize - m.end).infectBy(m);
+        return m.str.makeShared(match.getRuntime(), m.end, m.str.getByteList().realSize - m.end);
     }
 
     /** rb_reg_match_last

@@ -215,7 +215,6 @@ public class RubyMethod extends RubyObject {
     public RubyUnboundMethod unbind(Block unusedBlock) {
         RubyUnboundMethod unboundMethod =
         	RubyUnboundMethod.newUnboundMethod(implementationModule, methodName, originModule, originName, method);
-        unboundMethod.infectBy(this);
         
         return unboundMethod;
     }
@@ -251,7 +250,6 @@ public class RubyMethod extends RubyObject {
         buf.append(delimeter).append(methodName).append('>');
         
         RubyString str = getRuntime().newString(buf.toString());
-        str.setTaint(isTaint());
         return str;
     }
 

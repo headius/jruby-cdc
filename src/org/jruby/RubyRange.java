@@ -239,7 +239,6 @@ public class RubyRange extends RubyObject {
 
         str.cat(isExclusive ? DOTDOTDOT : DOTDOT);
         str.concat(str2);
-        str.infectBy(str2);
         return str;
     }
     
@@ -250,7 +249,6 @@ public class RubyRange extends RubyObject {
 
         str.cat(isExclusive ? DOTDOTDOT : DOTDOT);
         str.concat(str2);
-        str.infectBy(str2);
         return str;
 
     }

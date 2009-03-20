@@ -196,8 +196,6 @@ public class RubyGlobal {
         runtime.defineVariable(new DebugGlobalVariable(runtime, "$DEBUG", debug));
         runtime.defineVariable(new DebugGlobalVariable(runtime, "$-d", debug));
 
-        runtime.defineVariable(new SafeGlobalVariable(runtime, "$SAFE"));
-
         runtime.defineVariable(new BacktraceGlobalVariable(runtime, "$@"));
 
         runtime.defineVariable(new LoadedFeatures(runtime, "$\""));
@@ -402,30 +400,6 @@ public class RubyGlobal {
         public IRubyObject set(IRubyObject value) {
             runtime.setKCode(KCode.create(runtime, value.convertToString().toString()));
             return value;
-        }
-    }
-
-    private static class SafeGlobalVariable extends GlobalVariable {
-        public SafeGlobalVariable(Ruby runtime, String name) {
-            super(runtime, name, null);
-        }
-
-        @Override
-        public IRubyObject get() {
-            return runtime.newFixnum(runtime.getSafeLevel());
-        }
-
-        @Override
-        public IRubyObject set(IRubyObject value) {
-//            int level = RubyNumeric.fix2int(value);
-//            if (level < runtime.getSafeLevel()) {
-//            	throw runtime.newSecurityError("tried to downgrade safe level from " + 
-//            			runtime.getSafeLevel() + " to " + level);
-//            }
-//            runtime.setSafeLevel(level);
-            // thread.setSafeLevel(level);
-            runtime.getWarnings().warn(ID.SAFE_NOT_SUPPORTED, "SAFE levels are not supported in JRuby");
-            return RubyFixnum.newFixnum(runtime, runtime.getSafeLevel());
         }
     }
 

@@ -628,8 +628,6 @@ public class RubyKernel {
     }
     
     private static void exit(Ruby runtime, IRubyObject[] args, boolean hard) {
-        runtime.secure(4);
-
         int status = 1;
         if (args.length > 0) {
             RubyObject argument = (RubyObject)args[0];

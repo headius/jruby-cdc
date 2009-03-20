@@ -186,7 +186,6 @@ public class RubyMatchData extends RubyObject {
                 return runtime.newArray(runtime.getNil());
             } else {
                 RubyString ss = str.makeShared(runtime, begin, end - begin);
-                if (isTaint()) ss.setTaint(true);
                 return runtime.newArray(ss);
             }
         } else {
@@ -196,7 +195,6 @@ public class RubyMatchData extends RubyObject {
                     arr.append(runtime.getNil());
                 } else {
                     RubyString ss = str.makeShared(runtime, regs.beg[i], regs.end[i] - regs.beg[i]);
-                    if (isTaint()) ss.setTaint(true); 
                     arr.append(ss);
                 }
             }
@@ -289,14 +287,11 @@ public class RubyMatchData extends RubyObject {
         if (regs == null) {
             if (begin < 0) return runtime.newEmptyArray();
             IRubyObject s = str.substr(runtime, begin, end - begin);
-            s.setTaint(isTaint());
             result = block.yield(context, s).isTrue() ? runtime.newArray(s) : runtime.newEmptyArray();
         } else {
             result = runtime.newArray();
-            boolean taint = isTaint();
             for (int i = 0; i < regs.numRegs; i++) {
                 IRubyObject s = str.substr(runtime, regs.beg[i], regs.end[i] - regs.beg[i]);
-                if (taint) s.setTaint(true);
                 if (block.yield(context, s).isTrue()) result.append(s);
             }
         }
@@ -513,7 +508,7 @@ public class RubyMatchData extends RubyObject {
     public IRubyObject pre_match(ThreadContext context) {
         check();
         if (begin == -1) return context.getRuntime().getNil();
-        return str.makeShared(context.getRuntime(), 0, begin).infectBy(this);
+        return str.makeShared(context.getRuntime(), 0, begin);
     }
 
     /** match_post_match
@@ -523,7 +518,7 @@ public class RubyMatchData extends RubyObject {
     public IRubyObject post_match(ThreadContext context) {
         check();
         if (begin == -1) return context.getRuntime().getNil();
-        return str.makeShared(context.getRuntime(), end, str.getByteList().length() - end).infectBy(this);
+        return str.makeShared(context.getRuntime(), end, str.getByteList().length() - end);
     }
 
     /** match_to_s
@@ -534,7 +529,6 @@ public class RubyMatchData extends RubyObject {
         check();
         IRubyObject ss = RubyRegexp.last_match(this);
         if (ss.isNil()) ss = RubyString.newEmptyString(getRuntime());
-        if (isTaint()) ss.setTaint(true);
         return ss;
     }
 

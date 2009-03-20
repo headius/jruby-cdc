@@ -94,8 +94,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      */
     public static final int NIL_F = 1 << 1;
     public static final int FROZEN_F = 1 << 2;
-    public static final int TAINTED_F = 1 << 3;
-    public static final int UNTRUSTED_F = 1 << 4;
 
     public static final int FL_USHIFT = 5;
 
@@ -184,7 +182,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         this.metaClass = metaClass;
 
         if (runtime.isObjectSpaceEnabled()) addToObjectSpace(runtime);
-        if (runtime.getSafeLevel() >= 3) taint(runtime);
     }
 
     /**
@@ -196,27 +193,17 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         this.metaClass = metaClass;
 
         if (useObjectSpace) addToObjectSpace(runtime);
-        if (canBeTainted && runtime.getSafeLevel() >= 3) taint(runtime);
     }
 
     protected RubyBasicObject(Ruby runtime, RubyClass metaClass, boolean useObjectSpace) {
         this.metaClass = metaClass;
 
         if (useObjectSpace) addToObjectSpace(runtime);
-        if (runtime.getSafeLevel() >= 3) taint(runtime);
     }
 
     private void addToObjectSpace(Ruby runtime) {
         assert runtime.isObjectSpaceEnabled();
         runtime.getObjectSpace().add(this);
-    }
-
-    protected void taint(Ruby runtime) {
-        runtime.secure(4);
-        if (!isTaint()) {
-        	testFrozen();
-            setTaint(true);
-        }
     }
 
     /** rb_frozen_class_p
@@ -378,52 +365,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
     }
 
     /**
-     * Gets the taint. Shortcut for getFlag(TAINTED_F).
-     *
-     * @return true if this object is tainted
-     */
-    public boolean isTaint() {
-        return (flags & TAINTED_F) != 0;
-    }
-
-    /**
-     * Sets the taint flag. Shortcut for setFlag(TAINTED_F, taint)
-     *
-     * @param taint should this object be tainted or not?
-     */
-    public void setTaint(boolean taint) {
-        if (taint) {
-            flags |= TAINTED_F;
-        } else {
-            flags &= ~TAINTED_F;
-        }
-    }
-
-
-    /** OBJ_INFECT
-     *
-     * Infects this object with traits from the argument obj. In real
-     * terms this currently means that if obj is tainted, this object
-     * will get tainted too. It's possible to hijack this method to do
-     * other infections if that would be interesting.
-     */
-    public IRubyObject infectBy(IRubyObject obj) {
-        if (obj.isTaint()) setTaint(true);
-        if (obj.isUntrusted()) setUntrusted(true);
-        return this;
-    }
-
-    final RubyBasicObject infectBy(RubyBasicObject obj) {
-        flags |= (obj.flags & (TAINTED_F | UNTRUSTED_F));
-        return this;
-    }
-
-    final RubyBasicObject infectBy(int tuFlags) {
-        flags |= (tuFlags & (TAINTED_F | UNTRUSTED_F));
-        return this;
-    }
-
-    /**
      * Is this value frozen or not? Shortcut for doing
      * getFlag(FROZEN_F).
      *
@@ -444,31 +385,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
             flags |= FROZEN_F;
         } else {
             flags &= ~FROZEN_F;
-        }
-    }
-
-
-    /**
-     * Is this value untrusted or not? Shortcut for doing
-     * getFlag(UNTRUSTED_F).
-     *
-     * @return true if this object is frozen, false otherwise
-     */
-    public boolean isUntrusted() {
-        return (flags & UNTRUSTED_F) != 0;
-    }
-
-    /**
-     * Sets whether this object is frozen or not. Shortcut for doing
-     * setFlag(FROZEN_F, frozen).
-     *
-     * @param frozen should this object be frozen?
-     */
-    public void setUntrusted(boolean untrusted) {
-        if (untrusted) {
-            flags |= UNTRUSTED_F;
-        } else {
-            flags &= ~UNTRUSTED_F;
         }
     }
 
@@ -504,7 +420,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
             klass = makeMetaClass(getMetaClass());
         }
 
-        klass.setTaint(isTaint());
         if (isFrozen()) klass.setFrozen(true);
 
         return klass;
@@ -604,7 +519,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         IRubyObject str = RuntimeHelpers.invoke(getRuntime().getCurrentContext(), this, "to_s");
 
         if (!(str instanceof RubyString)) return (RubyString)anyToString();
-        if (isTaint()) str.setTaint(true);
         return (RubyString) str;
     }
 
@@ -671,7 +585,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         String cname = getMetaClass().getRealClass().getName();
         /* 6:tags 16:addr 1:eos */
         RubyString str = getRuntime().newString("#<" + cname + ":0x" + Integer.toHexString(System.identityHashCode(this)) + ">");
-        str.setTaint(isTaint());
         return str;
     }
 
@@ -710,8 +623,6 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         if (isImmediate()) throw getRuntime().newTypeError("can't dup " + getMetaClass().getName());
 
         IRubyObject dup = getMetaClass().getRealClass().allocate();
-        if (isTaint()) dup.setTaint(true);
-        if (isUntrusted()) dup.setUntrusted(true);
 
         initCopy(dup, this);
 
@@ -759,12 +670,10 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
         // We're cloning ourselves, so we know the result should be a RubyObject
         RubyObject clone = (RubyObject)getMetaClass().getRealClass().allocate();
         clone.setMetaClass(getSingletonClassClone());
-        if (isTaint()) clone.setTaint(true);
 
         initCopy(clone, this);
 
         if (isFrozen()) clone.setFrozen(true);
-        if (isUntrusted()) clone.setUntrusted(true);
         return clone;
     }
 
@@ -1412,12 +1321,8 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      * tainted. Will throw a suitable exception in that case.
      */
     protected final void ensureInstanceVariablesSettable() {
-        if (!isFrozen() && (getRuntime().getSafeLevel() < 4 || isTaint())) {
+        if (!isFrozen()) {
             return;
-        }
-
-        if (getRuntime().getSafeLevel() >= 4 && !isTaint()) {
-            throw getRuntime().newSecurityError(ERR_INSECURE_SET_INST_VAR);
         }
         if (isFrozen()) {
             if (this instanceof RubyModule) {

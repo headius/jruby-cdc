@@ -663,40 +663,11 @@ public final class Ruby {
         IRubyObject module = objectClass.getConstantAt(name);
         if (module == null) {
             module = defineModule(name);
-        } else if (getSafeLevel() >= 4) {
-            throw newSecurityError("Extending module prohibited.");
         } else if (!module.isModule()) {
             throw newTypeError(name + " is not a Module");
         }
 
         return (RubyModule) module;
-    }
-
-
-    /** 
-     * Retrieve the current safe level.
-     * 
-     * @see org.jruby.Ruby#setSaveLevel
-     */
-    public int getSafeLevel() {
-        return this.safeLevel;
-    }
-
-
-    /** 
-     * Set the current safe level:
-     * 
-     * 0 - strings from streams/environment/ARGV are tainted (default)
-     * 1 - no dangerous operation by tainted value
-     * 2 - process/file operations prohibited
-     * 3 - all generated objects are tainted
-     * 4 - no global (non-tainted) variable modification/no direct output
-     * 
-     * The safe level is set using $SAFE in Ruby code. It is not particularly
-     * well supported in JRuby.
-    */
-    public void setSafeLevel(int safeLevel) {
-        this.safeLevel = safeLevel;
     }
 
     public KCode getKCode() {
@@ -707,23 +678,9 @@ public final class Ruby {
         this.kcode = kcode;
     }
 
-    public void secure(int level) {
-        if (level <= safeLevel) {
-            throw newSecurityError("Insecure operation '" + getCurrentContext().getFrameName() + "' at level " + safeLevel);
-        }
-    }
-
     // FIXME moved this here to get what's obviously a utility method out of IRubyObject.
     // perhaps security methods should find their own centralized home at some point.
     public void checkSafeString(IRubyObject object) {
-        if (getSafeLevel() > 0 && object.isTaint()) {
-            ThreadContext tc = getCurrentContext();
-            if (tc.getFrameName() != null) {
-                throw newSecurityError("Insecure operation - " + tc.getFrameName());
-            }
-            throw newSecurityError("Insecure operation: -r");
-        }
-        secure(4);
         if (!(object instanceof RubyString)) {
             throw newTypeError(
                 "wrong argument type " + object.getMetaClass().getName() + " (expected String)");
@@ -750,8 +707,6 @@ public final class Ruby {
     private void init() {
         // Get the main threadcontext (gets constructed for us)
         ThreadContext tc = getCurrentContext();
-
-        safeLevel = config.getSafeLevel();
         
         // Construct key services
         loadService = config.createLoadService(this);
@@ -2010,8 +1965,6 @@ public final class Ruby {
         String file = context.getFile();
         
         try {
-            secure(4); /* should alter global state */
-
             context.setFile(scriptName);
             context.preNodeEval(objectClass, self, scriptName);
 
@@ -2030,8 +1983,6 @@ public final class Ruby {
         String file = context.getFile();
         
         try {
-            secure(4); /* should alter global state */
-
             context.setFile(filename);
             context.preNodeEval(objectClass, self, filename);
             
@@ -2056,8 +2007,6 @@ public final class Ruby {
         ThreadContext context = getCurrentContext();
 
         try {
-            secure(4); /* should alter global state */
-
             context.preNodeEval(objectClass, self);
             
             script.load(context, self, IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
@@ -2833,8 +2782,6 @@ public final class Ruby {
     private static ThreadLocal<Ruby> currentRuntime = new ThreadLocal<Ruby>();
     
     private long globalState = 1;
-    
-    private int safeLevel = -1;
 
     // Default objects
     private IRubyObject topSelf;

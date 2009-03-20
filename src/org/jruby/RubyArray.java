@@ -464,9 +464,6 @@ public class RubyArray extends RubyObject implements List {
             if ((flags & FROZEN_F) != 0) throw getRuntime().newFrozenError("array");           
             if ((flags & TMPLOCK_ARR_F) != 0) throw getRuntime().newTypeError("can't modify array during iteration");
         }
-        if (!isTaint() && getRuntime().getSafeLevel() >= 4) {
-            throw getRuntime().newSecurityError("Insecure: can't modify array");
-        }
     }
 
     /** rb_ary_modify
@@ -978,7 +975,6 @@ public class RubyArray extends RubyObject implements List {
      */
     public final RubyArray aryDup() {
         RubyArray dup = new RubyArray(getRuntime(), getMetaClass(), this);
-        dup.flags |= flags & TAINTED_F; // from DUP_SETUP
         // rb_copy_generic_ivar from DUP_SETUP here ...unlikely..
         return dup;
     }
@@ -1435,19 +1431,16 @@ public class RubyArray extends RubyObject implements List {
     private IRubyObject inspectAry(ThreadContext context) {
         ByteList buffer = new ByteList();
         buffer.append('[');
-        boolean tainted = isTaint();
 
         for (int i = 0; i < realLength; i++) {
             if (i > 0) buffer.append(',').append(' ');
 
             RubyString str = inspect(context, values[begin + i]);
-            if (str.isTaint()) tainted = true;
             buffer.append(str.getByteList());
         }
         buffer.append(']');
 
         RubyString str = getRuntime().newString(buffer);
-        if (tainted) str.setTaint(true);
 
         return str;
     }
@@ -1632,8 +1625,6 @@ public class RubyArray extends RubyObject implements List {
         final Ruby runtime = context.getRuntime();
         if (realLength == 0) return RubyString.newEmptyString(runtime);
 
-        boolean taint = isTaint() || sep.isTaint();
-
         int len = 1;
         for (int i = begin; i < begin + realLength; i++) {            
             IRubyObject value;
@@ -1677,11 +1668,9 @@ public class RubyArray extends RubyObject implements List {
             if (i > 0 && sepBytes != null) buf.append(sepBytes);
 
             buf.append(tmp.asString().getByteList());
-            if (tmp.isTaint()) taint = true;
         }
 
         RubyString result = runtime.newString(buf); 
-        if (taint) result.setTaint(true);
         return result;
     }
 
@@ -2101,7 +2090,6 @@ public class RubyArray extends RubyObject implements List {
         } else {
             dup = new RubyArray(getRuntime(), getMetaClass(), this);
         }
-        dup.flags |= flags & TAINTED_F; // from DUP_SETUP
         // rb_copy_generic_ivar from DUP_SETUP here ...unlikely..
         return dup;
     }
@@ -2611,7 +2599,6 @@ public class RubyArray extends RubyObject implements List {
 
         RubyArray result = new RubyArray(runtime, realLength);
         flatten19(context, -1, result);
-        result.infectBy(this);
         return result;
     }
 
@@ -2623,7 +2610,6 @@ public class RubyArray extends RubyObject implements List {
 
         RubyArray result = new RubyArray(runtime, realLength);
         flatten19(context, level, result);
-        result.infectBy(this);
         return result;
     }
 
@@ -2693,7 +2679,7 @@ public class RubyArray extends RubyObject implements List {
         if (!tmp.isNil()) return join(context, tmp);
 
         long len = RubyNumeric.num2long(times);
-        if (len == 0) return new RubyArray(getRuntime(), getMetaClass(), IRubyObject.NULL_ARRAY).infectBy(this);
+        if (len == 0) return new RubyArray(getRuntime(), getMetaClass(), IRubyObject.NULL_ARRAY);
         if (len < 0) throw getRuntime().newArgumentError("negative argument");
 
         if (Long.MAX_VALUE / len < realLength) {
@@ -2712,8 +2698,6 @@ public class RubyArray extends RubyObject implements List {
         } catch (ArrayIndexOutOfBoundsException e) {
             concurrentModification();
         }
-
-        ary2.infectBy(this);
 
         return ary2;
     }

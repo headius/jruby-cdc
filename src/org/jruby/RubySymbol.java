@@ -291,11 +291,6 @@ public class RubySymbol extends RubyObject {
         return this;
     }
 
-    @Override
-    public IRubyObject taint(ThreadContext context) {
-        return this;
-    }
-
     private RubyString newShared(Ruby runtime) {
         return RubyString.newStringShared(runtime, symbolBytes);
     }

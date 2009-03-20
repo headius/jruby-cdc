@@ -117,10 +117,6 @@ public class RubyStruct extends RubyObject {
 
     private void modify() {
         testFrozen();
-
-        if (!isTaint() && getRuntime().getSafeLevel() >= 4) {
-            throw getRuntime().newSecurityError("Insecure: can't modify struct");
-        }
     }
     
     @JRubyMethod

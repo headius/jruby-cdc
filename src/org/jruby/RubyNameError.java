@@ -131,7 +131,7 @@ public class RubyNameError extends RubyException {
             RubyArray arr = runtime.newArray(method, runtime.newString(description));
             ByteList msgBytes = new ByteList(format.length() + description.length() + method.toString().length());
             Sprintf.sprintf(msgBytes, format, arr);
-            return runtime.newString(msgBytes).infectBy(object);
+            return runtime.newString(msgBytes);
         }
     }
 
@@ -201,7 +201,6 @@ public class RubyNameError extends RubyException {
         if (message.isNil()) return getRuntime().newString(message.getMetaClass().getName());
         RubyString str = message.convertToString();
         if (str != message) message = str;
-        if (isTaint()) message.setTaint(true);
         return message;
     }
 

@@ -72,7 +72,7 @@ public class RubyObjectSpace {
         }
         IRubyObject obj = args[0];
         runtime.getObjectSpace().addFinalizer(obj, finalizer);
-        return runtime.newArray(runtime.newFixnum(runtime.getSafeLevel()), finalizer);
+        return runtime.newArray(runtime.newFixnum(-1), finalizer);
     }
 
     @JRubyMethod(name = "undefine_finalizer", required = 1, frame = true, module = true, visibility = Visibility.PRIVATE)

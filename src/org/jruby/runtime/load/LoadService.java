@@ -208,9 +208,7 @@ public class LoadService {
         }
         
         // "." dir is used for relative path loads from a given file, as in require '../foo/bar'
-        if (runtime.getSafeLevel() == 0) {
-            addPath(".");
-        }
+        addPath(".");
     }
 
     private void addLoadedFeature(RubyString loadNameRubyString) {

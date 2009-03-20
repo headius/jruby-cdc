@@ -354,7 +354,7 @@ public class RubyStringScanner extends RubyObject {
         }
 
         ByteList value = str.getByteList();
-        if (pos >= value.realSize) return RubyString.newEmptyString(getRuntime()).infectBy(str);
+        if (pos >= value.realSize) return RubyString.newEmptyString(getRuntime());
         if (pos + len > value.realSize) len = value.realSize - pos;
 
         return extractBegLen(context.getRuntime(), pos, len);
@@ -484,7 +484,7 @@ public class RubyStringScanner extends RubyObject {
     public IRubyObject rest(ThreadContext context) {
         check();
         ByteList value = str.getByteList();
-        if (pos >= value.realSize) return RubyString.newEmptyString(context.getRuntime()).infectBy(str);
+        if (pos >= value.realSize) return RubyString.newEmptyString(context.getRuntime());
         return extractRange(context.getRuntime(), pos, value.realSize);
     }
     
@@ -515,8 +515,7 @@ public class RubyStringScanner extends RubyObject {
     }
     
     private IRubyObject inspect(String msg) {
-        RubyString result = getRuntime().newString("#<" + getMetaClass() + " " + msg + ">"); 
-        if (str != null) result.infectBy(str);
+        RubyString result = getRuntime().newString("#<" + getMetaClass() + " " + msg + ">");
         return result;
     }
     

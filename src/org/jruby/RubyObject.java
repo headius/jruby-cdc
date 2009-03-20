@@ -751,55 +751,6 @@ public class RubyObject extends RubyBasicObject {
         return context.getRuntime().getNil();
     }
 
-    /** rb_obj_tainted
-     *
-     *  call-seq:
-     *     obj.tainted?    => true or false
-     *
-     *  Returns <code>true</code> if the object is tainted.
-     *
-     */
-    @JRubyMethod(name = "tainted?")
-    public RubyBoolean tainted_p(ThreadContext context) {
-        return context.getRuntime().newBoolean(isTaint());
-    }
-
-    /** rb_obj_taint
-     *
-     *  call-seq:
-     *     obj.taint -> obj
-     *
-     *  Marks <i>obj</i> as tainted---if the <code>$SAFE</code> level is
-     *  set appropriately, many method calls which might alter the running
-     *  programs environment will refuse to accept tainted strings.
-     */
-    @JRubyMethod(name = "taint")
-    public IRubyObject taint(ThreadContext context) {
-        taint(context.getRuntime());
-        return this;
-    }
-
-    /** rb_obj_untaint
-     *
-     *  call-seq:
-     *     obj.untaint    => obj
-     *
-     *  Removes the taint from <i>obj</i>.
-     *
-     *  Only callable in if more secure than 3.
-     */
-    @JRubyMethod(name = "untaint")
-    public IRubyObject untaint(ThreadContext context) {
-        context.getRuntime().secure(3);
-
-        if (isTaint()) {
-            testFrozen();
-            setTaint(false);
-        }
-
-        return this;
-    }
-
     /** rb_obj_freeze
      *
      *  call-seq:
@@ -823,7 +774,6 @@ public class RubyObject extends RubyBasicObject {
     public IRubyObject freeze(ThreadContext context) {
         Ruby runtime = context.getRuntime();
         if ((flags & FROZEN_F) == 0 && (runtime.is1_9() || !isImmediate())) {
-            if (runtime.getSafeLevel() >= 4 && !isTaint()) throw runtime.newSecurityError("Insecure: can't freeze object");
             flags |= FROZEN_F;
         }
         return this;
@@ -843,47 +793,6 @@ public class RubyObject extends RubyBasicObject {
     @JRubyMethod(name = "frozen?")
     public RubyBoolean frozen_p(ThreadContext context) {
         return context.getRuntime().newBoolean(isFrozen());
-    }
-
-    /** rb_obj_untrusted
-     *  call-seq:
-     *     obj.untrusted?    => true or false
-     *
-     *  Returns <code>true</code> if the object is untrusted.
-     */
-    @JRubyMethod(name = "untrusted?", compat = CompatVersion.RUBY1_9)
-    public RubyBoolean untrusted_p(ThreadContext context) {
-        return context.getRuntime().newBoolean(isUntrusted());
-    }
-
-    /** rb_obj_untrust
-     *  call-seq:
-     *     obj.untrust -> obj
-     *
-     *  Marks <i>obj</i> as untrusted.
-     */
-    @JRubyMethod(compat = CompatVersion.RUBY1_9)
-    public IRubyObject untrust(ThreadContext context) {
-        if (!isUntrusted() && !isImmediate()) {
-            checkFrozen();
-            flags |= UNTRUSTED_F;
-        }
-        return this;
-    }
-
-    /** rb_obj_trust
-     *  call-seq:
-     *     obj.trust    => obj
-     *
-     *  Removes the untrusted mark from <i>obj</i>.
-     */
-    @JRubyMethod(compat = CompatVersion.RUBY1_9)
-    public IRubyObject trust(ThreadContext context) {
-        if (isUntrusted() && !isImmediate()) {
-            checkFrozen();
-            flags &= ~UNTRUSTED_F;
-        }
-        return this;
     }
 
     /** rb_inspect

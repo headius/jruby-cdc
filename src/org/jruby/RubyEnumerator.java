@@ -175,9 +175,8 @@ public class RubyEnumerator extends RubyObject {
 
         if (recurse) {
             bytes.append("...>".getBytes());
-            return RubyString.newStringNoCopy(runtime, bytes).taint(context);
+            return RubyString.newStringNoCopy(runtime, bytes);
         } else {
-            boolean tainted = isTaint();
             bytes.append(RubyObject.inspect(context, object).getByteList());
             bytes.append((byte)':');
             bytes.append(method.asString().getByteList());
@@ -190,12 +189,10 @@ public class RubyEnumerator extends RubyObject {
                     } else {
                         bytes.append((byte)')');
                     }
-                    if (methodArgs[i].isTaint()) tainted = true;
                 }
             }
             bytes.append((byte)'>');
             RubyString result = RubyString.newStringNoCopy(runtime, bytes);
-            if (tainted) result.setTaint(true);
             return result;
         }
     }

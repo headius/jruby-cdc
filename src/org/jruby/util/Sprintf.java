@@ -437,7 +437,6 @@ public class Sprintf {
                     }
                     ByteList bytes = arg.asString().getByteList();
                     int len = bytes.length();
-                    if (arg.isTaint()) tainted = true;
                     if ((flags & FLAG_PRECISION) != 0 && precision < len) {
                         len = precision;
                     }

@@ -925,11 +925,6 @@ public class RubyFixnum extends RubyInteger {
         return super.id();
     }
 
-    @Override
-    public IRubyObject taint(ThreadContext context) {
-        return this;
-    }
-
     // Piece of mri rb_to_id
     @Override
     public String asJavaString() {

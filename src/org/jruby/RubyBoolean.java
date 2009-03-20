@@ -155,11 +155,6 @@ public class RubyBoolean extends RubyObject {
         }
     }
 
-    @Override
-    public IRubyObject taint(ThreadContext context) {
-        return this;
-    }
-
     public void marshalTo(MarshalStream output) throws java.io.IOException {
         output.write(isTrue() ? 'T' : 'F');
     }

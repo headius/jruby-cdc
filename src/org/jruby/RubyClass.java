@@ -213,8 +213,6 @@ public class RubyClass extends RubyModule {
         superClass = superClazz;
         marshal = superClazz.marshal; // use parent's marshal
         superClazz.addSubclass(this);
-        
-        infectBy(superClass);        
     }
     
     /** 
@@ -227,8 +225,6 @@ public class RubyClass extends RubyModule {
         superClazz.addSubclass(this);
         
         this.extraCallSites = extraCallSites;
-        
-        infectBy(superClass);        
     }
 
     /** 
